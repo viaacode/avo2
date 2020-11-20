@@ -1,8 +1,20 @@
-.m-search-block .c-menu {
-	margin-top: 5px;
+@import '../../styles/settings/colors';
 
-	.c-spinner {
-		margin: 20px;
+.m-search-block {
+	.c-menu {
+		margin-top: 5px;
+
+		.c-dropdown-results {
+			height: 240px;
+
+			.c-menu__item {
+				border-bottom: 0.1rem solid $color-gray-100;
+			}
+		}
+
+		.c-spinner {
+			margin: 20px;
+		}
 	}
 }
 

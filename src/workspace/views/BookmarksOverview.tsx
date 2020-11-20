@@ -32,6 +32,7 @@ import {
 } from '../../shared/helpers';
 import { truncateTableValue } from '../../shared/helpers/truncate';
 import { BookmarksViewsPlaysService, ToastService } from '../../shared/services';
+import { CONTENT_TYPE_TO_EVENT_CONTENT_TYPE } from '../../shared/services/bookmarks-views-plays-service';
 import {
 	BookmarkInfo,
 	EventContentType,
@@ -69,6 +70,7 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 			label: t('collection/views/collection-overview___titel'),
 			col: '6',
 			sortable: true,
+			visibleByDefault: true,
 		},
 		...(isMobileWidth()
 			? []
@@ -78,9 +80,10 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 						label: t('workspace/views/bookmarks___aangemaakt-op'),
 						col: '3',
 						sortable: true,
+						visibleByDefault: true,
 					},
 			  ]),
-		{ id: 'actions', label: '', col: '1' },
+		{ id: 'actions', tooltip: t('workspace/views/bookmarks-overview___acties'), col: '1' },
 	] as TableColumn[];
 
 	const fetchBookmarks = useCallback(async () => {
@@ -123,7 +126,7 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 			await BookmarksViewsPlaysService.toggleBookmark(
 				bookmarkToDelete.contentId,
 				user,
-				bookmarkToDelete.contentType,
+				CONTENT_TYPE_TO_EVENT_CONTENT_TYPE[bookmarkToDelete.contentType],
 				true
 			);
 
@@ -156,8 +159,8 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 	};
 
 	// Render functions
-	const getDetailLink = (contentType: EventContentType, contentLinkId: string) => {
-		return buildLink(
+	const getDetailLink = (contentType: EventContentType, contentLinkId: string) =>
+		buildLink(
 			{
 				item: APP_PATH.ITEM_DETAIL.route,
 				collection: APP_PATH.COLLECTION_DETAIL.route,
@@ -167,7 +170,6 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 				id: contentLinkId,
 			}
 		);
-	};
 
 	const renderThumbnail = ({
 		contentLinkId,
@@ -175,12 +177,16 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 		contentTitle,
 		contentThumbnailPath,
 	}: BookmarkInfo) => (
-		<Link to={getDetailLink(contentType, contentLinkId)} title={contentTitle}>
+		<Link
+			to={getDetailLink(CONTENT_TYPE_TO_EVENT_CONTENT_TYPE[contentType], contentLinkId)}
+			title={contentTitle}
+		>
 			<Thumbnail
 				alt="thumbnail"
 				category={contentType}
 				className="m-collection-overview-thumbnail"
 				src={contentThumbnailPath || undefined}
+				showCategoryIcon
 			/>
 		</Link>
 	);
@@ -194,16 +200,24 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 	}: BookmarkInfo) => (
 		<div className="c-content-header">
 			<h3 className="c-content-header__header">
-				<Link to={getDetailLink(contentType, contentLinkId)} title={contentTitle}>
+				<Link
+					to={getDetailLink(
+						CONTENT_TYPE_TO_EVENT_CONTENT_TYPE[contentType],
+						contentLinkId
+					)}
+					title={contentTitle}
+				>
 					{truncateTableValue(contentTitle)}
 				</Link>
 			</h3>
 			<div className="c-content-header__meta u-text-muted">
 				<MetaData category={contentType}>
 					<MetaDataItem>
-						<span title={`Aangemaakt: ${formatDate(contentCreatedAt)}`}>
-							{fromNow(contentCreatedAt)}
-						</span>
+						{contentCreatedAt && (
+							<span title={`Aangemaakt: ${formatDate(contentCreatedAt)}`}>
+								{formatDate(contentCreatedAt)}
+							</span>
+						)}
 					</MetaDataItem>
 					<MetaDataItem icon="eye" label={String(contentViews || 0)} />
 				</MetaData>
@@ -211,20 +225,18 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 		</div>
 	);
 
-	const renderDeleteAction = (bookmarkInfo: BookmarkInfo) => {
-		return (
-			<Button
-				title={t('workspace/views/bookmarks___verwijder-uit-bladwijzers')}
-				ariaLabel={t('workspace/views/bookmarks___verwijder-uit-bladwijzers')}
-				icon="delete"
-				type="danger-hover"
-				onClick={() => {
-					setBookmarkToDelete(bookmarkInfo);
-					setIsDeleteModalOpen(true);
-				}}
-			/>
-		);
-	};
+	const renderDeleteAction = (bookmarkInfo: BookmarkInfo) => (
+		<Button
+			title={t('workspace/views/bookmarks___verwijder-uit-bladwijzers')}
+			ariaLabel={t('workspace/views/bookmarks___verwijder-uit-bladwijzers')}
+			icon="delete"
+			type="danger-hover"
+			onClick={() => {
+				setBookmarkToDelete(bookmarkInfo);
+				setIsDeleteModalOpen(true);
+			}}
+		/>
+	);
 
 	const renderCell = (bookmarkInfo: BookmarkInfo, colKey: string) => {
 		switch (colKey as keyof BookmarkInfo | 'actions') {
@@ -301,7 +313,7 @@ const BookmarksOverview: FunctionComponent<BookmarksOverviewProps> = ({
 			<DeleteObjectModal
 				title={t('workspace/views/bookmarks___verwijder-bladwijzer')}
 				body={t(
-					'collection/views/collection-overview___bent-u-zeker-deze-actie-kan-niet-worden-ongedaan-gemaakt'
+					'workspace/views/bookmarks-overview___ben-je-zeker-dat-je-deze-bladwijzer-wil-verwijderen-br-deze-actie-kan-niet-ongedaan-gemaakt-worden'
 				)}
 				isOpen={isDeleteModalOpen}
 				onClose={() => setIsDeleteModalOpen(false)}

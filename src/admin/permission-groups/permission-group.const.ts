@@ -18,25 +18,33 @@ export const GET_PERMISSION_GROUP_OVERVIEW_TABLE_COLS: () => FilterableColumn[] 
 		id: 'label',
 		label: i18n.t('admin/permission-groups/permission-group___naam'),
 		sortable: true,
+		visibleByDefault: true,
 	},
 	{
 		id: 'description',
 		label: i18n.t('admin/permission-groups/permission-group___beschrijving'),
 		sortable: true,
+		visibleByDefault: true,
 	},
 	{
 		id: 'created_at',
 		label: i18n.t('admin/permission-groups/permission-group___gemaakt-op'),
 		sortable: true,
+		visibleByDefault: true,
 		filterType: 'DateRangeDropdown',
 	},
 	{
 		id: 'updated_at',
 		label: i18n.t('admin/permission-groups/permission-group___aangepast-op'),
 		sortable: true,
+		visibleByDefault: true,
 		filterType: 'DateRangeDropdown',
 	},
-	{ id: 'actions', label: '' },
+	{
+		id: 'actions',
+		tooltip: i18n.t('admin/permission-groups/permission-group___acties'),
+		visibleByDefault: true,
+	},
 ];
 
 export const GET_PERMISSIONS_TABLE_COLS: () => TableColumn[] = () => [
@@ -44,11 +52,17 @@ export const GET_PERMISSIONS_TABLE_COLS: () => TableColumn[] = () => [
 		id: 'label',
 		label: i18n.t('admin/permission-groups/permission-group___permissie-code'),
 		sortable: true,
+		visibleByDefault: true,
 	},
 	{
 		id: 'description',
 		label: i18n.t('admin/permission-groups/permission-group___permissie-beschrijving'),
 		sortable: true,
+		visibleByDefault: true,
 	},
-	{ id: 'actions', label: '' },
+	{
+		id: 'actions',
+		tooltip: i18n.t('admin/permission-groups/permission-group___acties'),
+		visibleByDefault: true,
+	},
 ];

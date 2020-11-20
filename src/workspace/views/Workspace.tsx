@@ -25,7 +25,7 @@ import { Avo } from '@viaa/avo2-types';
 
 import { AssignmentOverview } from '../../assignment/views';
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
-import { getProfileId } from '../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../authentication/helpers/get-profile-id';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import CollectionOrBundleOverview from '../../collection/components/CollectionOrBundleOverview';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
@@ -80,10 +80,10 @@ const Workspace: FunctionComponent<WorkspaceProps> = ({ history, match, location
 			PermissionService.hasPermission(PermissionName.VIEW_OWN_COLLECTIONS, null, user),
 			PermissionService.hasPermission(PermissionName.VIEW_OWN_BUNDLES, null, user),
 			PermissionService.hasPermission(PermissionName.CREATE_ASSIGNMENTS, null, user),
-			PermissionService.hasPermission(PermissionName.CREATE_ASSIGNMENT_RESPONSE, null, user),
+			PermissionService.hasPermission(PermissionName.VIEW_ASSIGNMENTS, null, user),
 			PermissionService.hasPermission(PermissionName.CREATE_BOOKMARKS, null, user),
 		])
-			.then(response => {
+			.then((response) => {
 				setTabCounts({
 					[COLLECTIONS_ID]: get(response[0], 'data.collection_counts.aggregate.count', 0),
 					[BUNDLES_ID]: get(response[0], 'data.bundle_counts.aggregate.count', 0),
@@ -99,7 +99,7 @@ const Workspace: FunctionComponent<WorkspaceProps> = ({ history, match, location
 					[BOOKMARKS_ID]: response[5],
 				});
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error(
 					'Failed to check permissions or get tab counts for workspace overview page',
 					err,
@@ -228,7 +228,7 @@ const Workspace: FunctionComponent<WorkspaceProps> = ({ history, match, location
 
 	const getNavTabs = useCallback(() => {
 		return compact(
-			GET_TABS().map(tab => {
+			GET_TABS().map((tab) => {
 				if (permissions[tab.id]) {
 					return {
 						...tab,
@@ -248,7 +248,7 @@ const Workspace: FunctionComponent<WorkspaceProps> = ({ history, match, location
 	// Render
 	const renderFilter = (filter: TabFilter) => {
 		const currentFilter = filter.options.find(
-			f => f.id === (activeFilter || filter.options[0].id)
+			(f) => f.id === (activeFilter || filter.options[0].id)
 		);
 
 		return (

@@ -43,7 +43,9 @@ export class AssignmentLabelsService {
 		let variables;
 		try {
 			variables = {
-				objects: labels.map(labelObj => omit(labelObj, ['__typename', 'enum_color', 'id'])),
+				objects: labels.map((labelObj) =>
+					omit(labelObj, ['__typename', 'enum_color', 'id'])
+				),
 			};
 			const response = await dataService.mutate({
 				variables,
@@ -131,7 +133,7 @@ export class AssignmentLabelsService {
 				return;
 			}
 			variables = {
-				objects: labelIds.map(labelId => ({
+				objects: labelIds.map((labelId) => ({
 					assignment_id: assignmentId,
 					assignment_tag_id: labelId,
 				})),
@@ -206,6 +208,6 @@ export class AssignmentLabelsService {
 	): Avo.Assignment.Label[] {
 		return (get(assignment, 'assignment_assignment_tags', []) as {
 			assignment_tag: Avo.Assignment.Label;
-		}[]).map(assignmentLabelLink => assignmentLabelLink.assignment_tag);
+		}[]).map((assignmentLabelLink) => assignmentLabelLink.assignment_tag);
 	}
 }

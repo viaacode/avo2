@@ -1,4 +1,4 @@
-import { compact, get, pullAllBy, remove, uniq } from 'lodash-es';
+import { compact, get, isNil, pullAllBy, remove, uniq } from 'lodash-es';
 import React, { FunctionComponent, ReactNode, ReactText, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
@@ -19,6 +19,7 @@ import {
 	Grid,
 	Select,
 	Spacer,
+	Table,
 	TagInfo,
 	TagList,
 	TagOption,
@@ -28,12 +29,10 @@ import {
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
+import { SpecialUserGroup } from '../../admin/user-groups/user-group.const';
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
-import {
-	getProfile,
-	getProfileAlias,
-	getProfileId,
-} from '../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../authentication/helpers/get-profile-id';
+import { getProfileAlias, getProfileFromUser } from '../../authentication/helpers/get-profile-info';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import { redirectToClientPage } from '../../authentication/helpers/redirects';
 import {
@@ -45,14 +44,16 @@ import { selectUser } from '../../authentication/store/selectors';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
 import { FileUpload } from '../../shared/components';
 import { ROUTE_PARTS } from '../../shared/constants';
-import { CustomError } from '../../shared/helpers';
+import { CustomError, formatDate } from '../../shared/helpers';
+import { stringToSelectOption } from '../../shared/helpers/string-to-select-options';
 import { ToastService } from '../../shared/services';
 import { CampaignMonitorService } from '../../shared/services/campaign-monitor-service';
 import { EducationOrganisationService } from '../../shared/services/education-organizations-service';
 import { OrganisationService } from '../../shared/services/organizations-service';
 import store, { AppState } from '../../store';
+import { USERS_IN_SAME_COMPANY_COLUMNS } from '../settings.const';
 import { SettingsService } from '../settings.service';
-import { UpdateProfileValues } from '../settings.types';
+import { UpdateProfileValues, UsersInSameCompanyColumn } from '../settings.types';
 
 import './Profile.scss';
 
@@ -72,23 +73,21 @@ interface FieldPermissions {
 	SUBJECTS: FieldPermission;
 	EDUCATION_LEVEL: FieldPermission;
 	EDUCATIONAL_ORGANISATION: FieldPermission;
-	ORGANISATION: FieldPermission;
+	ORGANISATION: FieldPermission & { VIEW_USERS_IN_SAME_COMPANY: boolean };
 }
 
 export interface ProfileProps extends DefaultSecureRouteProps {
 	redirectTo?: string;
 }
 
-const Profile: FunctionComponent<ProfileProps & {
-	getLoginState: () => Dispatch;
-}> = ({ redirectTo = APP_PATH.LOGGED_IN_HOME.route, history, location, user, getLoginState }) => {
+const Profile: FunctionComponent<
+	ProfileProps & {
+		getLoginState: () => Dispatch;
+	}
+> = ({ redirectTo = APP_PATH.LOGGED_IN_HOME.route, history, location, user, getLoginState }) => {
 	const [t] = useTranslation();
 	const isCompleteProfileStep = location.pathname.includes(ROUTE_PARTS.completeProfile);
 
-	const gqlEnumToSelectOption = (enumLabel: string): TagInfo => ({
-		label: enumLabel,
-		value: enumLabel,
-	});
 	const gqlOrganizationToSelectOption = (
 		org: Avo.EducationOrganization.Organization
 	): TagInfo => ({
@@ -108,20 +107,24 @@ const Profile: FunctionComponent<ProfileProps & {
 		[cityAndZipCode: string]: Avo.EducationOrganization.Organization[];
 	}>({});
 	const [selectedEducationLevels, setSelectedEducationLevels] = useState<TagInfo[]>(
-		get(user, 'profile.educationLevels', []).map(gqlEnumToSelectOption)
+		get(user, 'profile.educationLevels', []).map(stringToSelectOption)
 	);
 	const [selectedSubjects, setSelectedSubjects] = useState<TagInfo[]>(
-		get(user, 'profile.subjects', []).map(gqlEnumToSelectOption)
+		get(user, 'profile.subjects', []).map(stringToSelectOption)
 	);
 	const [selectedOrganizations, setSelectedOrganizations] = useState<TagInfo[]>(
 		get(user, 'profile.organizations', []).map(gqlOrganizationToSelectOption)
 	);
+	const [firstName, setFirstName] = useState<string>(get(user, 'first_name') || '');
+	const [lastName, setLastName] = useState<string>(get(user, 'last_name') || '');
 	const [alias, setAlias] = useState<string>(user ? getProfileAlias(user) : '');
 	const [avatar, setAvatar] = useState<string | null>(
-		get(getProfile(user, true), 'avatar', null)
+		get(getProfileFromUser(user, true), 'avatar', null)
 	);
-	const [bio, setBio] = useState<string | null>(get(getProfile(user, true), 'bio', null));
-	const [func, setFunc] = useState<string | null>(get(getProfile(user, true), 'function', null));
+	const [title, setTitle] = useState<string | null>(
+		get(getProfileFromUser(user, true), 'title', null)
+	);
+	const [bio, setBio] = useState<string | null>(get(getProfileFromUser(user, true), 'bio', null));
 	const [isSaving, setIsSaving] = useState<boolean>(false);
 	const [subscribeToNewsletter, setSubscribeToNewsletter] = useState<boolean>(false);
 	const [allEducationLevels, setAllEducationLevels] = useState<string[] | null>(null);
@@ -130,47 +133,60 @@ const Profile: FunctionComponent<ProfileProps & {
 		Partial<Avo.Organization.Organization>[] | null
 	>(null);
 	const [companyId, setCompanyId] = useState<string | null>(
-		get(getProfile(user, true), 'company_id', null)
+		get(getProfileFromUser(user, true), 'company_id', null)
 	);
 	const [permissions, setPermissions] = useState<FieldPermissions | null>(null);
+	const [profileErrors, setProfileErrors] = useState<
+		Partial<{ [prop in keyof UpdateProfileValues]: string }>
+	>({});
+	const [usersInSameCompany, setUsersInSameCompany] = useState<Partial<Avo.User.Profile>[]>([]);
+
+	const isExceptionAccount = get(user, 'profile.is_exception', false);
+
+	const isPupil = get(user, 'profile.userGroupIds[0]') === SpecialUserGroup.Pupil;
 
 	useEffect(() => {
 		setPermissions({
 			SUBJECTS: {
 				VIEW: PermissionService.hasPerm(user, PermissionName.VIEW_SUBJECTS_ON_PROFILE_PAGE),
 				EDIT: PermissionService.hasPerm(user, PermissionName.EDIT_SUBJECTS_ON_PROFILE_PAGE),
-				REQUIRED: PermissionService.hasPerm(
-					user,
-					PermissionName.REQUIRED_SUBJECTS_ON_PROFILE_PAGE
-				),
+				REQUIRED:
+					PermissionService.hasPerm(
+						user,
+						PermissionName.REQUIRED_SUBJECTS_ON_PROFILE_PAGE
+					) && !isExceptionAccount,
 			},
 			EDUCATION_LEVEL: {
 				VIEW: PermissionService.hasPerm(
 					user,
 					PermissionName.VIEW_EDUCATION_LEVEL_ON_PROFILE_PAGE
 				),
-				EDIT: PermissionService.hasPerm(
-					user,
-					PermissionName.EDIT_EDUCATION_LEVEL_ON_PROFILE_PAGE
-				),
-				REQUIRED: PermissionService.hasPerm(
-					user,
-					PermissionName.REQUIRED_EDUCATION_LEVEL_ON_PROFILE_PAGE
-				),
+				EDIT:
+					PermissionService.hasPerm(
+						user,
+						PermissionName.EDIT_EDUCATION_LEVEL_ON_PROFILE_PAGE
+					) && !isExceptionAccount,
+				REQUIRED:
+					PermissionService.hasPerm(
+						user,
+						PermissionName.REQUIRED_EDUCATION_LEVEL_ON_PROFILE_PAGE
+					) && !isExceptionAccount,
 			},
 			EDUCATIONAL_ORGANISATION: {
 				VIEW: PermissionService.hasPerm(
 					user,
 					PermissionName.VIEW_EDUCATIONAL_ORGANISATION_ON_PROFILE_PAGE
 				),
-				EDIT: PermissionService.hasPerm(
-					user,
-					PermissionName.EDIT_EDUCATIONAL_ORGANISATION_ON_PROFILE_PAGE
-				),
-				REQUIRED: PermissionService.hasPerm(
-					user,
-					PermissionName.REQUIRED_EDUCATIONAL_ORGANISATION_ON_PROFILE_PAGE
-				),
+				EDIT:
+					PermissionService.hasPerm(
+						user,
+						PermissionName.EDIT_EDUCATIONAL_ORGANISATION_ON_PROFILE_PAGE
+					) && !isExceptionAccount,
+				REQUIRED:
+					PermissionService.hasPerm(
+						user,
+						PermissionName.REQUIRED_EDUCATIONAL_ORGANISATION_ON_PROFILE_PAGE
+					) && !isExceptionAccount,
 			},
 			ORGANISATION: {
 				VIEW: PermissionService.hasPerm(
@@ -185,9 +201,13 @@ const Profile: FunctionComponent<ProfileProps & {
 					user,
 					PermissionName.REQUIRED_ORGANISATION_ON_PROFILE_PAGE
 				),
+				VIEW_USERS_IN_SAME_COMPANY: PermissionService.hasPerm(
+					user,
+					PermissionName.VIEW_USERS_IN_SAME_COMPANY
+				),
 			},
 		});
-	}, [user]);
+	}, [isExceptionAccount, user]);
 
 	useEffect(() => {
 		if (!permissions) {
@@ -196,7 +216,7 @@ const Profile: FunctionComponent<ProfileProps & {
 		if (permissions.EDUCATIONAL_ORGANISATION.EDIT || isCompleteProfileStep) {
 			EducationOrganisationService.fetchCities()
 				.then(setCities)
-				.catch(err => {
+				.catch((err) => {
 					console.error(new CustomError('Failed to get cities', err));
 					ToastService.danger(
 						t('settings/components/profile___het-ophalen-van-de-steden-is-mislukt')
@@ -208,7 +228,7 @@ const Profile: FunctionComponent<ProfileProps & {
 				.then((subjects: string[]) => {
 					setAllSubjects(subjects);
 				})
-				.catch(err => {
+				.catch((err) => {
 					console.error(new CustomError('Failed to get subjects from the database', err));
 					ToastService.danger(
 						t('settings/components/profile___het-ophalen-van-de-vakken-is-mislukt')
@@ -220,7 +240,7 @@ const Profile: FunctionComponent<ProfileProps & {
 				.then((educationLevels: string[]) => {
 					setAllEducationLevels(educationLevels);
 				})
-				.catch(err => {
+				.catch((err) => {
 					console.error(
 						new CustomError('Failed to get education levels from database', err)
 					);
@@ -235,15 +255,40 @@ const Profile: FunctionComponent<ProfileProps & {
 		// TODO for view we should use the company name from the profile object instead of the company_id and lookup in the list
 		// Waiting for: https://meemoo.atlassian.net/browse/DEV-985
 		if (permissions.ORGANISATION.VIEW || permissions.ORGANISATION.EDIT) {
-			OrganisationService.fetchAllOrganisations()
+			OrganisationService.fetchOrganisations(false)
 				.then(setAllOrganisations)
-				.catch(err => {
+				.catch((err) => {
 					console.error(
 						new CustomError('Failed to get organisations from database', err)
 					);
 					ToastService.danger(
 						t(
 							'settings/components/profile___het-ophalen-van-de-organisaties-is-mislukt'
+						)
+					);
+				});
+		}
+
+		const companyId = get(user, 'profile.company_id');
+		if (companyId && permissions.ORGANISATION.VIEW_USERS_IN_SAME_COMPANY) {
+			OrganisationService.fetchUsersByCompanyId(companyId)
+				.then((usersInSameCompany) => {
+					setUsersInSameCompany(
+						usersInSameCompany.filter(
+							(profile) => profile.id !== get(user, 'profile.id')
+						)
+					);
+				})
+				.catch((err) => {
+					console.error(
+						new CustomError(
+							'Failed to get users in the same company from database',
+							err
+						)
+					);
+					ToastService.danger(
+						t(
+							'settings/components/profile___het-ophalen-van-de-gebruikers-in-dezelfde-organisatie-is-mislukt'
 						)
 					);
 				});
@@ -267,14 +312,14 @@ const Profile: FunctionComponent<ProfileProps & {
 					return;
 				}
 				setOrganizationsLoadingState('loading');
-				const [city, zipCode] = selectedCity.split(/[()]/g).map(s => s.trim());
+				const [city, zipCode] = selectedCity.split(/[()]/g).map((s) => s.trim());
 				let orgs: Avo.EducationOrganization.Organization[];
 				if (organizationsCache[selectedCity]) {
 					// get from cache
 					orgs = [...organizationsCache[selectedCity]];
 				} else {
 					// fetch from server
-					orgs = await EducationOrganisationService.fetchEducationOrganizations(
+					orgs = await EducationOrganisationService.fetchEducationOrganisations(
 						city,
 						zipCode
 					);
@@ -292,9 +337,14 @@ const Profile: FunctionComponent<ProfileProps & {
 				console.error('Failed to get educational organizations', err, {
 					selectedCity,
 				});
+				ToastService.danger(
+					t(
+						'settings/components/profile___het-ophalen-van-de-onderwijsinstellingen-is-mislukt'
+					)
+				);
 			}
 		})();
-	}, [organizationsCache, selectedOrganizations, selectedCity]);
+	}, [organizationsCache, selectedOrganizations, selectedCity, t]);
 
 	const areRequiredFieldsFilledIn = (profileInfo: Partial<UpdateProfileValues>) => {
 		if (!permissions) {
@@ -341,30 +391,48 @@ const Profile: FunctionComponent<ProfileProps & {
 		try {
 			setIsSaving(true);
 			const profileId: string = getProfileId(user);
-			const newProfileInfo = {
+			const newProfileInfo: Partial<UpdateProfileValues> = {
+				userId: user.uid,
+				firstName,
+				lastName,
 				alias,
-				avatar,
+				title,
 				bio,
-				educationLevels: (selectedEducationLevels || []).map(option => ({
+				avatar: avatar || null,
+				educationLevels: (selectedEducationLevels || []).map((option) => ({
 					profile_id: profileId,
 					key: option.value.toString(),
 				})),
-				subjects: (selectedSubjects || []).map(option => ({
+				subjects: (selectedSubjects || []).map((option) => ({
 					profile_id: profileId,
 					key: option.value.toString(),
 				})),
-				organizations: (selectedOrganizations || []).map(option => ({
+				organizations: (selectedOrganizations || []).map((option) => ({
 					profile_id: profileId,
 					organization_id: option.value.toString().split(':')[0],
 					unit_id: option.value.toString().split(':')[1] || null,
 				})),
-				company_id: companyId || undefined,
+				company_id: companyId || null,
 			};
 			if (!areRequiredFieldsFilledIn(newProfileInfo)) {
 				setIsSaving(false);
 				return;
 			}
-			await SettingsService.updateProfileInfo(getProfile(user), newProfileInfo);
+			try {
+				await SettingsService.updateProfileInfo(getProfileFromUser(user), newProfileInfo);
+			} catch (err) {
+				setIsSaving(false);
+				if (JSON.stringify(err).includes('DUPLICATE_ALIAS')) {
+					ToastService.danger(
+						t('settings/components/profile___deze-schermnaam-is-reeds-in-gebruik')
+					);
+					setProfileErrors({
+						alias: t('settings/components/profile___schermnaam-is-reeds-in-gebruik'),
+					});
+					return;
+				}
+				throw err;
+			}
 
 			if (isCompleteProfileStep) {
 				// Refetch user permissions since education level can change user group
@@ -423,7 +491,7 @@ const Profile: FunctionComponent<ProfileProps & {
 	};
 
 	const onSelectedOrganizationChanged = (orgLabel: string) => {
-		const selectedOrg = organizations.find(org => org.label === orgLabel);
+		const selectedOrg = organizations.find((org) => org.label === orgLabel);
 		if (!selectedOrg) {
 			ToastService.danger(
 				t(
@@ -439,7 +507,7 @@ const Profile: FunctionComponent<ProfileProps & {
 
 	const removeOrganization = async (orgLabel: ReactText) => {
 		const newOrganizations = [...selectedOrganizations];
-		remove(newOrganizations, org => org.label === orgLabel);
+		remove(newOrganizations, (org) => org.label === orgLabel);
 		setSelectedOrganizations(newOrganizations);
 	};
 
@@ -481,14 +549,14 @@ const Profile: FunctionComponent<ProfileProps & {
 						placeholder={t(
 							'settings/components/profile___selecteer-de-vakken-die-u-geeft'
 						)}
-						options={(allSubjects || []).map(subject => ({
+						options={(allSubjects || []).map((subject) => ({
 							label: subject,
 							value: subject,
 						}))}
 						value={selectedSubjects}
-						onChange={selectedValues => setSelectedSubjects(selectedValues || [])}
+						onChange={(selectedValues) => setSelectedSubjects(selectedValues || [])}
 					/>
-				) : (
+				) : selectedSubjects.length ? (
 					<TagList
 						tags={selectedSubjects.map(
 							(subject): TagOption => ({ id: subject.value, label: subject.label })
@@ -496,12 +564,18 @@ const Profile: FunctionComponent<ProfileProps & {
 						swatches={false}
 						closable={false}
 					/>
+				) : (
+					'-'
 				)}
 			</FormGroup>
 		);
 	};
 
 	const renderEducationLevelsField = (editable: boolean, required: boolean) => {
+		if (!selectedEducationLevels.length && !editable) {
+			return null;
+		}
+
 		return (
 			<FormGroup
 				label={t('settings/components/profile___onderwijsniveau')}
@@ -514,12 +588,12 @@ const Profile: FunctionComponent<ProfileProps & {
 						placeholder={t(
 							'settings/components/profile___selecteer-een-opleidingsniveau'
 						)}
-						options={(allEducationLevels || []).map(edLevel => ({
+						options={(allEducationLevels || []).map((edLevel) => ({
 							label: edLevel,
 							value: edLevel,
 						}))}
 						value={selectedEducationLevels}
-						onChange={selectedValues =>
+						onChange={(selectedValues) =>
 							setSelectedEducationLevels(selectedValues || [])
 						}
 					/>
@@ -559,7 +633,7 @@ const Profile: FunctionComponent<ProfileProps & {
 				{editable ? (
 					<Select
 						options={compact(
-							(allOrganisations || []).map(org => {
+							(allOrganisations || []).map((org) => {
 								if (!org.name || !org.or_id) {
 									return null;
 								}
@@ -576,7 +650,7 @@ const Profile: FunctionComponent<ProfileProps & {
 					'-'
 				) : (
 					get(
-						(allOrganisations || []).find(org => org.or_id === companyId),
+						(allOrganisations || []).find((org) => org.or_id === companyId),
 						'name'
 					) || t('settings/components/profile___onbekende-organisatie')
 				)}
@@ -585,6 +659,9 @@ const Profile: FunctionComponent<ProfileProps & {
 	};
 
 	const renderEducationOrganisationsField = (editable: boolean, required: boolean) => {
+		if (!editable && !selectedOrganizations.length) {
+			return null;
+		}
 		return (
 			<FormGroup
 				label={t('settings/components/profile___school-organisatie')}
@@ -596,7 +673,7 @@ const Profile: FunctionComponent<ProfileProps & {
 						<TagList
 							closable
 							swatches={false}
-							tags={selectedOrganizations.map(org => ({
+							tags={selectedOrganizations.map((org) => ({
 								label: org.label,
 								id: org.label,
 							}))}
@@ -611,7 +688,7 @@ const Profile: FunctionComponent<ProfileProps & {
 										),
 										value: '',
 									},
-									...cities.map(c => ({ label: c, value: c })),
+									...(cities || []).map((c) => ({ label: c, value: c })),
 								]}
 								value={selectedCity || ''}
 								onChange={onSelectedCityChanged}
@@ -645,7 +722,7 @@ const Profile: FunctionComponent<ProfileProps & {
 					<TagList
 						closable={false}
 						swatches={false}
-						tags={selectedOrganizations.map(org => ({
+						tags={selectedOrganizations.map((org) => ({
 							label: org.label,
 							id: org.label,
 						}))}
@@ -658,7 +735,7 @@ const Profile: FunctionComponent<ProfileProps & {
 	const renderCompleteProfilePage = () => {
 		return (
 			<Container mode="horizontal" size="medium">
-				<Container mode="vertical">
+				<Container mode="vertical" className="p-profile-page">
 					<BlockHeading type="h1">
 						<Trans i18nKey="settings/components/profile___je-bent-er-bijna-vervolledig-nog-je-profiel">
 							Je bent er bijna. Vervolledig nog je profiel.
@@ -718,83 +795,142 @@ const Profile: FunctionComponent<ProfileProps & {
 		return null;
 	};
 
+	const renderUsersInSameCompanyTableCell = (
+		profile: Partial<Avo.User.Profile>,
+		columnId: UsersInSameCompanyColumn
+	) => {
+		switch (columnId) {
+			case 'full_name':
+				return get(profile, 'user.full_name') || '-';
+
+			case 'mail':
+				return get(profile, 'user.mail') || '-';
+
+			case 'user_group':
+				// TODO cleanup queries and get paths everywhere to use the singular forms: profile_user_group and group
+				return (
+					get(profile, 'profile_user_group.group.label') ||
+					get(profile, 'profile_user_group.groups[0].label') ||
+					get(profile, 'profile_user_groups[0].group.label') ||
+					get(profile, 'profile_user_groups[0].groups[0].label') ||
+					'-'
+				);
+
+			case 'is_blocked':
+				return get(profile, 'user.is_blocked') || 'Nee';
+
+			case 'last_access_at':
+				const lastAccessDate = get(profile, 'user.last_access_at');
+				return !isNil(lastAccessDate) ? formatDate(lastAccessDate) : '-';
+		}
+	};
+
 	const renderProfilePage = () => {
 		return (
-			<Container mode="vertical">
-				<Spacer margin="bottom">
+			<Container mode="vertical" className="p-profile-page">
+				<Spacer margin="bottom-extra-large">
 					<Grid>
 						<Column size="3-7">
 							<Form type="standard">
 								<>
 									<FormGroup
-										label={t('settings/components/profile___nickname')}
-										labelFor="alias"
+										label={t('settings/components/account___voornaam')}
+										labelFor="first_name"
+										error={get(profileErrors, 'first_name')}
 									>
 										<TextInput
-											id="alias"
-											placeholder={t(
-												'settings/components/profile___een-unieke-gebruikersnaam'
-											)}
-											value={alias || ''}
-											onChange={setAlias}
+											id="first_name"
+											value={firstName || ''}
+											onChange={setFirstName}
 										/>
 									</FormGroup>
 									<FormGroup
-										label={t('settings/components/profile___functie')}
-										labelFor="func"
+										label={t('settings/components/account___achternaam')}
+										labelFor="last_name"
+										error={get(profileErrors, 'last_name')}
 									>
 										<TextInput
-											id="func"
-											placeholder={t(
-												'settings/components/profile___bv-leerkracht-basis-onderwijs'
-											)}
-											value={func || ''}
-											onChange={setFunc}
+											id="last_name"
+											value={lastName || ''}
+											onChange={setLastName}
 										/>
 									</FormGroup>
-									{!get(user, 'profile.organisation') && (
-										<FormGroup
-											label={t('settings/components/profile___profielfoto')}
-											labelFor="profilePicture"
-										>
-											<FileUpload
-												label={t(
-													'settings/components/profile___upload-een-profiel-foto'
-												)}
-												urls={compact([avatar])}
-												allowMulti={false}
-												assetType="PROFILE_AVATAR"
-												ownerId={get(user, 'profile.id')}
-												onChange={urls => setAvatar(urls[0])}
-											/>
-										</FormGroup>
-									)}
-									{!!get(user, 'profile.organisation.logo_url') && (
-										<div
-											className="c-logo-preview"
-											style={{
-												backgroundImage: `url(${get(
-													user,
-													'profile.organisation.logo_url'
-												)})`,
-											}}
-										/>
-									)}
-									<FormGroup
-										label={t('settings/components/profile___bio')}
-										labelFor="bio"
-									>
-										<TextArea
-											name="bio"
-											id="bio"
-											height="medium"
-											placeholder={t(
-												'settings/components/profile___een-korte-beschrijving-van-jezelf'
+									{!isPupil && (
+										<>
+											<FormGroup
+												label={t('settings/components/profile___nickname')}
+												labelFor="alias"
+												error={get(profileErrors, 'alias')}
+											>
+												<TextInput
+													id="alias"
+													placeholder={t(
+														'settings/components/profile___een-unieke-gebruikersnaam'
+													)}
+													value={alias || ''}
+													onChange={setAlias}
+												/>
+											</FormGroup>
+											<FormGroup
+												label={t('settings/components/profile___functie')}
+												labelFor="title"
+											>
+												<TextInput
+													id="title"
+													placeholder={t(
+														'settings/components/profile___bv-leerkracht-basis-onderwijs'
+													)}
+													value={title || ''}
+													onChange={setTitle}
+												/>
+											</FormGroup>
+											{!get(user, 'profile.organisation') && (
+												<FormGroup
+													label={t(
+														'settings/components/profile___profielfoto'
+													)}
+													labelFor="profilePicture"
+												>
+													<FileUpload
+														label={t(
+															'settings/components/profile___upload-een-profiel-foto'
+														)}
+														urls={compact([avatar])}
+														allowMulti={false}
+														assetType="PROFILE_AVATAR"
+														ownerId={get(user, 'profile.id')}
+														onChange={(urls) => setAvatar(urls[0])}
+													/>
+												</FormGroup>
 											)}
-											value={bio || ''}
-											onChange={setBio}
-										/>
-									</FormGroup>
+											{!!get(user, 'profile.organisation.logo_url') && (
+												<div
+													className="c-logo-preview"
+													style={{
+														backgroundImage: `url(${get(
+															user,
+															'profile.organisation.logo_url'
+														)})`,
+													}}
+												/>
+											)}
+											<FormGroup
+												label={t('settings/components/profile___bio')}
+												labelFor="bio"
+											>
+												<TextArea
+													name="bio"
+													id="bio"
+													height="medium"
+													placeholder={t(
+														'settings/components/profile___een-korte-beschrijving-van-jezelf'
+													)}
+													value={bio || ''}
+													onChange={setBio}
+												/>
+											</FormGroup>
+										</>
+									)}
 								</>
 								{renderFieldVisibleOrRequired('SUBJECTS', renderSubjectsField)}
 								{renderFieldVisibleOrRequired(
@@ -818,26 +954,51 @@ const Profile: FunctionComponent<ProfileProps & {
 							</Form>
 						</Column>
 						<Column size="3-5">
-							<>
-								{/*<Box>*/}
-								{/*	<BlockHeading type="h4"><Trans i18nKey="settings/components/profile___volledigheid-profiel">Volledigheid profiel</Trans></BlockHeading>*/}
-								{/*	/!* TODO replace with components from component repo *!/*/}
-								{/*	<div className="c-progress-bar" />*/}
-								{/*</Box>*/}
-								<Spacer margin={['top', 'bottom']}>
-									<Box>
-										<p>
-											<Trans i18nKey="settings/components/profile___profiel-sidebar-intro-tekst">
-												Vul hier wat info over jezelf in! Deze informatie
-												wordt getoond op jouw persoonlijk profiel. Je kan
-												voor elk veld aanduiden of je deze informatie wil
-												delen of niet.
-											</Trans>
-										</p>
-									</Box>
-								</Spacer>
-							</>
+							{!isPupil && (
+								<>
+									{/*<Box>*/}
+									{/*	<BlockHeading type="h4"><Trans i18nKey="settings/components/profile___volledigheid-profiel">Volledigheid profiel</Trans></BlockHeading>*/}
+									{/*	/!* TODO replace with components from component repo *!/*/}
+									{/*	<div className="c-progress-bar" />*/}
+									{/*</Box>*/}
+									<Spacer margin={['top', 'bottom']}>
+										<Box>
+											<p>
+												<Trans i18nKey="settings/components/profile___profiel-sidebar-intro-tekst">
+													Vul hier wat info over jezelf in! Deze
+													informatie wordt getoond op jouw persoonlijk
+													profiel. Je kan voor elk veld aanduiden of je
+													deze informatie wil delen of niet.
+												</Trans>
+											</p>
+										</Box>
+									</Spacer>
+								</>
+							)}
 						</Column>
+						{get(permissions, 'ORGANISATION.VIEW_USERS_IN_SAME_COMPANY') && (
+							<Column size="3-12">
+								<Spacer margin="top-extra-large">
+									<BlockHeading type="h2">
+										{t(
+											'settings/components/profile___gebruikers-in-je-organisatie'
+										)}
+									</BlockHeading>
+									<Spacer margin="top">
+										<Table
+											data={usersInSameCompany}
+											columns={USERS_IN_SAME_COMPANY_COLUMNS()}
+											emptyStateMessage={t(
+												'settings/components/profile___er-zitten-geen-andere-gebruikers-uit-je-organisatie-op-het-archief-voor-onderwijs'
+											)}
+											rowKey="id"
+											renderCell={renderUsersInSameCompanyTableCell as any}
+											variant="bordered"
+										/>
+									</Spacer>
+								</Spacer>
+							</Column>
+						)}
 					</Grid>
 				</Spacer>
 			</Container>

@@ -1,3 +1,4 @@
+import { Location } from 'history';
 import { get } from 'lodash-es';
 import moment from 'moment';
 import React from 'react';
@@ -25,8 +26,15 @@ let checkSessionTimeoutTimerId: number | null = null;
 function checkIfSessionExpires(expiresAt: string) {
 	const date = moment(expiresAt);
 
+	// Create fake location object
+	const location = ({
+		pathname: window.location.pathname,
+		state: {
+			from: { pathname: window.location.pathname, search: window.location.search },
+		},
+	} as unknown) as Location;
 	if (date.subtract(5, 'minutes').valueOf() < new Date().getTime()) {
-		logoutAndRedirectToLogin();
+		logoutAndRedirectToLogin(location);
 	} else if (date.subtract(10, 'minutes').valueOf() < new Date().getTime()) {
 		// Show warning since user is about to be logged out
 		ToastService.info(
@@ -37,12 +45,11 @@ function checkIfSessionExpires(expiresAt: string) {
 				<Spacer margin="top-small">
 					<Button
 						label={i18n.t('authentication/store/actions___ga-naar-login')}
-						onClick={logoutAndRedirectToLogin}
+						onClick={() => logoutAndRedirectToLogin(location)}
 						type="primary"
 					/>
 				</Spacer>
 			</>,
-			false,
 			{
 				autoClose: false,
 				position: 'bottom-left',

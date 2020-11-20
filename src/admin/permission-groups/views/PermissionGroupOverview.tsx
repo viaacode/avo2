@@ -2,8 +2,9 @@ import { isNil } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
-import { Button, ButtonToolbar, Container } from '@viaa/avo2-components';
+import { Button, ButtonToolbar } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
 import { GENERATE_SITE_TITLE } from '../../../constants';
@@ -13,11 +14,13 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
-import { formatDate, navigate } from '../../../shared/helpers';
+import { buildLink, formatDate, navigate } from '../../../shared/helpers';
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import { ItemsTableState } from '../../items/items.types';
 import FilterTable, { getFilters } from '../../shared/components/FilterTable/FilterTable';
+import { UpdatePermissionsButton } from '../../shared/components/UpdatePermissionsButton/UpdatePermissionsButton';
 import { getDateRangeFilters, getQueryFilter } from '../../shared/helpers/filters';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import {
@@ -44,16 +47,18 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [tableState, setTableState] = useState<Partial<PermissionGroupTableState>>({});
+	const [isLoading, setIsLoading] = useState<boolean>(false);
 
 	const [t] = useTranslation();
 
 	const fetchPermissionGroups = useCallback(async () => {
+		setIsLoading(true);
 		const generateWhereObject = (filters: Partial<ItemsTableState>) => {
 			const andFilters: any[] = [];
 			andFilters.push(
-				...getQueryFilter(filters.query, (queryWordWildcard: string) => [
-					{ label: { _ilike: queryWordWildcard } },
-					{ description: { _ilike: queryWordWildcard } },
+				...getQueryFilter(filters.query, (queryWildcard: string) => [
+					{ label: { _ilike: queryWildcard } },
+					{ description: { _ilike: queryWildcard } },
 				])
 			);
 			andFilters.push(...getDateRangeFilters(filters, ['created_at', 'updated_at']));
@@ -81,6 +86,7 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 				),
 			});
 		}
+		setIsLoading(false);
 	}, [setPermissionGroups, setLoadingInfo, t, tableState]);
 
 	useEffect(() => {
@@ -100,8 +106,7 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 		ToastService.success(
 			t(
 				'admin/permission-groups/views/permission-group-overview___de-permissie-groep-is-verwijdert'
-			),
-			false
+			)
 		);
 	};
 
@@ -116,6 +121,13 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 		columnId: PermissionGroupOverviewTableCols
 	) => {
 		switch (columnId) {
+			case 'label':
+				return (
+					<Link to={buildLink(ADMIN_PATH.PERMISSION_GROUP_DETAIL, { id: rowData.id })}>
+						{truncateTableValue(rowData[columnId])}
+					</Link>
+				);
+
 			case 'created_at':
 			case 'updated_at':
 				return !!rowData[columnId] ? formatDate(rowData[columnId] as string) : '-';
@@ -210,9 +222,10 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 					)}
 					itemsPerPage={ITEMS_PER_PAGE}
 					onTableStateChanged={setTableState}
+					isLoading={isLoading}
 				/>
 				<DeleteObjectModal
-					deleteObjectCallback={() => handleDelete()}
+					deleteObjectCallback={handleDelete}
 					isOpen={isConfirmModalOpen}
 					onClose={() => setIsConfirmModalOpen(false)}
 				/>
@@ -225,14 +238,18 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 			pageTitle={t(
 				'admin/permission-groups/views/permission-group-overview___permissie-groepen-overzicht'
 			)}
+			size="full-width"
 		>
 			<AdminLayoutTopBarRight>
-				<Button
-					label={t(
-						'admin/permission-groups/views/permission-group-overview___permissie-groep-toevoegen'
-					)}
-					onClick={() => history.push(PERMISSION_GROUP_PATH.PERMISSION_GROUP_CREATE)}
-				/>
+				<ButtonToolbar>
+					<UpdatePermissionsButton />
+					<Button
+						label={t(
+							'admin/permission-groups/views/permission-group-overview___permissie-groep-toevoegen'
+						)}
+						onClick={() => history.push(PERMISSION_GROUP_PATH.PERMISSION_GROUP_CREATE)}
+					/>
+				</ButtonToolbar>
 			</AdminLayoutTopBarRight>
 			<AdminLayoutBody>
 				<MetaTags>
@@ -250,15 +267,11 @@ const PermissionGroupOverview: FunctionComponent<PermissionGroupOverviewProps> =
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<LoadingErrorLoadedComponent
-							loadingInfo={loadingInfo}
-							dataObject={permissionGroups}
-							render={renderPermissionGroupTable}
-						/>
-					</Container>
-				</Container>
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={permissionGroups}
+					render={renderPermissionGroupTable}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

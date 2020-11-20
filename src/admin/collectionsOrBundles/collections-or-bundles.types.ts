@@ -2,8 +2,8 @@ import { FilterableTableState } from '../shared/components/FilterTable/FilterTab
 
 export type CollectionsOrBundlesOverviewTableCols =
 	| 'title'
-	| 'author'
-	| 'author_role'
+	| 'owner_profile_id'
+	| 'author_user_group'
 	| 'last_updated_by_profile'
 	| 'created_at'
 	| 'updated_at'
@@ -22,7 +22,7 @@ export type CollectionsOrBundlesOverviewTableCols =
 export interface CollectionsOrBundlesTableState extends FilterableTableState {
 	title: string;
 	author: string;
-	author_role: string;
+	author_user_group: string;
 	last_updated_by_profile: string;
 	created_at: string;
 	updated_at: string;
@@ -36,4 +36,12 @@ export interface CollectionsOrBundlesTableState extends FilterableTableState {
 	subjects: string[];
 	education_levels: string[];
 	collection_labels: string[];
+	is_copy: boolean;
 }
+
+export type CollectionBulkAction =
+	| 'publish'
+	| 'depublish'
+	| 'delete'
+	| 'change_author'
+	| 'change_labels';

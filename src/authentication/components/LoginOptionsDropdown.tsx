@@ -3,8 +3,6 @@ import { RouteComponentProps, withRouter } from 'react-router';
 
 import { Container, Flex, FlexItem } from '@viaa/avo2-components';
 
-import { getFromPath } from '../helpers/redirects';
-
 import LoginOptions from './LoginOptions';
 import './LoginOptionsDropdown.scss';
 
@@ -28,7 +26,6 @@ const LoginOptionsDropdown: FunctionComponent<LoginOptionsDropdownProps & RouteC
 							location={location}
 							match={match}
 							onOptionClicked={closeDropdown}
-							redirectAfterLogin={getFromPath(location)}
 						/>
 					</FlexItem>
 				</Flex>

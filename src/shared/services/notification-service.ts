@@ -51,22 +51,10 @@ export class NotificationService {
 		throughPlatform: boolean
 	): Promise<void> {
 		try {
-			const getResponse = await dataService.query({
-				query: GET_NOTIFICATION,
-				variables: {
-					profileId,
-					key,
-				},
-			});
-			if (getResponse.errors) {
-				throw new CustomError('Response from graphql contains errors', null, {
-					getResponse,
-				});
-			}
-			const notificationEntryExists: boolean = !!get(
-				getResponse,
-				'data.users_notifications[0]'
-			);
+			const notificationEntryExists: boolean = !!(await NotificationService.getNotification(
+				key,
+				profileId
+			));
 			// If entry already exists => update existing entry
 			// If no entry exists in the notifications table => insert a new entry
 			const mutation = notificationEntryExists ? UPDATE_NOTIFICATION : INSERT_NOTIFICATION;
@@ -84,7 +72,6 @@ export class NotificationService {
 				throw new CustomError('Response from graphql contains errors', null, {
 					mutation,
 					mutateResponse,
-					getResponse,
 				});
 			}
 		} catch (err) {

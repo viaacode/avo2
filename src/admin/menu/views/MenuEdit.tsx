@@ -8,7 +8,6 @@ import {
 	Badge,
 	Button,
 	ButtonToolbar,
-	Container,
 	Flex,
 	IconName,
 	Spacer,
@@ -22,12 +21,12 @@ import { DefaultSecureRouteProps } from '../../../authentication/components/Secu
 import { GENERATE_SITE_TITLE } from '../../../constants';
 import { CustomError, navigate } from '../../../shared/helpers';
 import { dataService, ToastService } from '../../../shared/services';
-import { fetchAllUserGroups } from '../../../shared/services/user-groups-service';
 import { ValueOf } from '../../../shared/types';
 import { ADMIN_PATH } from '../../admin.const';
 import { GET_PERMISSIONS_FROM_CONTENT_PAGE_BY_PATH } from '../../content/content.gql';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import { PickerItem } from '../../shared/types';
+import { useUserGroupOptions } from '../../user-groups/hooks/useUserGroupOptions';
 import { MenuEditForm } from '../components';
 import { GET_PAGE_TYPES_LANG, INITIAL_MENU_FORM, MENU_PATH } from '../menu.const';
 import { MenuService } from '../menu.service';
@@ -51,28 +50,34 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 	const [isLoading, setIsLoading] = useState<boolean>(false);
 	const [isSaving, setIsSaving] = useState<boolean>(false);
 	const [permissionWarning, setPermissionWarning] = useState<ReactNode | null>(null);
-	const [allUserGroups, setAllUserGroups] = useState<TagInfo[]>([]);
+	const [allUserGroups] = useUserGroupOptions('TagInfo', true) as [TagInfo[], boolean];
 
 	// Fetch menu items depending on menu parent param
 	// This is necessary for populating the menu parent options for our form
 	useEffect(() => {
-		MenuService.fetchMenuItems(menuParentId).then(menuItemsByPosition => {
-			if (menuItemsByPosition && menuItemsByPosition.length) {
-				setMenuItems(menuItemsByPosition);
-			} else {
-				// Go back to overview if no menu items are present
+		MenuService.fetchMenuItems(menuParentId)
+			.then((menuItemsByPosition) => {
+				if (menuItemsByPosition && menuItemsByPosition.length) {
+					setMenuItems(menuItemsByPosition);
+				} else {
+					// Go back to overview if no menu items are present
+					ToastService.danger(
+						t(
+							'admin/menu/views/menu-edit___er-werden-geen-navigatie-items-gevonden-voor-menu-name',
+							{
+								menuName,
+							}
+						)
+					);
+					history.push(MENU_PATH.MENU_OVERVIEW);
+				}
+			})
+			.catch((err) => {
+				console.error(new CustomError('Failed to fetch menu items', err));
 				ToastService.danger(
-					t(
-						'admin/menu/views/menu-edit___er-werden-geen-navigatie-items-gevonden-voor-menu-name',
-						{
-							menuName,
-						}
-					),
-					false
+					t('admin/menu/views/menu-edit___het-ophalen-van-de-menu-items-is-mislukt')
 				);
-				history.push(MENU_PATH.MENU);
-			}
-		});
+			});
 	}, [history, menuName, menuParentId, t]);
 
 	// Fetch menu item by id
@@ -106,23 +111,6 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 		}
 	}, [menuItemId, menuParentId]);
 
-	// Get labels of the userGroups, so we can show a readable error message
-	useEffect(() => {
-		fetchAllUserGroups()
-			.then(userGroups => {
-				setAllUserGroups(userGroups);
-			})
-			.catch((err: any) => {
-				console.error('Failed to get user groups', err);
-				ToastService.danger(
-					t(
-						'admin/shared/components/user-group-select/user-group-select___het-controleren-van-je-account-rechten-is-mislukt'
-					),
-					false
-				);
-			});
-	}, [setAllUserGroups, t]);
-
 	const checkMenuItemContentPagePermissionsMismatch = useCallback(
 		(response: ApolloQueryResult<any>) => {
 			let contentUserGroupIds: number[] = get(
@@ -131,7 +119,7 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 				[]
 			);
 			const navItemUserGroupIds: number[] = menuForm.user_group_ids || [];
-			const allUserGroupIds: number[] = allUserGroups.map(ug => ug.value as number);
+			const allUserGroupIds: number[] = allUserGroups.map((ug) => ug.value as number);
 
 			// Add all user groups to content page user groups if content page is accessible by special user group: logged in users
 			if (contentUserGroupIds.includes(SpecialPermissionGroups.loggedInUsers)) {
@@ -144,9 +132,9 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 			const faultyUserGroupIds = without(navItemUserGroupIds, ...contentUserGroupIds);
 			if (faultyUserGroupIds.length) {
 				const faultyUserGroups = compact(
-					faultyUserGroupIds.map(faultyUserGroupId => {
+					faultyUserGroupIds.map((faultyUserGroupId) => {
 						const faultyUserGroup = allUserGroups.find(
-							userGroup => userGroup.value === faultyUserGroupId
+							(userGroup) => userGroup.value === faultyUserGroupId
 						);
 						return get(faultyUserGroup, 'label', null);
 					})
@@ -164,8 +152,8 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 								De geselecteerde pagina is niet toegankelijk voor:
 							</Trans>
 							<ButtonToolbar>
-								{faultyUserGroups.map(group => (
-									<Badge text={group} />
+								{faultyUserGroups.map((group) => (
+									<Badge text={group} key={`badge-${group}`} />
 								))}
 							</ButtonToolbar>
 						</Spacer>
@@ -189,10 +177,10 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 						path: menuForm.content_path,
 					},
 				})
-				.then(response => {
+				.then((response) => {
 					checkMenuItemContentPagePermissionsMismatch(response);
 				})
-				.catch(err => {
+				.catch((err) => {
 					console.error(
 						new CustomError('Failed to get permissions from page', err, {
 							query: 'GET_PERMISSIONS_FROM_CONTENT_PAGE_BY_PATH',
@@ -204,8 +192,7 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 					ToastService.danger(
 						t(
 							'admin/menu/views/menu-edit___het-controleren-of-de-permissies-van-de-pagina-overeenkomen-met-de-zichtbaarheid-van-dit-navigatie-item-is-mislukt'
-						),
-						false
+						)
 					);
 				});
 		}
@@ -224,7 +211,7 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 		: t('admin/menu/views/menu-edit___navigatie-toevoegen');
 	const menuParentOptions = uniqBy(
 		compact(
-			menuItems.map(menuItem => {
+			menuItems.map((menuItem) => {
 				if (!menuItem.placement) {
 					return null;
 				}
@@ -282,19 +269,17 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 			};
 
 			if (pageType === 'create') {
-				const id = await MenuService.insertMenuItem({
+				await MenuService.insertMenuItem({
 					...menuItem,
 					// Get description from existing items or use form description field
 					description: get(menuItems, '[0].description', menuForm.description),
 					position: menuItems.length,
 				});
-				navigate(history, ADMIN_PATH.MENU_ITEM_EDIT, {
-					id,
+				navigate(history, ADMIN_PATH.MENU_DETAIL, {
 					menu: menuForm.placement as string,
 				});
 				ToastService.success(
-					t('admin/menu/views/menu-edit___het-navigatie-item-is-succesvol-aangemaakt'),
-					false
+					t('admin/menu/views/menu-edit___het-navigatie-item-is-succesvol-aangemaakt')
 				);
 			} else {
 				if (isNil(menuItemId)) {
@@ -310,9 +295,11 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 						updated_at: new Date().toISOString(),
 					} as Avo.Menu.Menu,
 				]);
+				navigate(history, ADMIN_PATH.MENU_DETAIL, {
+					menu: menuForm.placement as string,
+				});
 				ToastService.success(
-					t('admin/menu/views/menu-edit___het-navigatie-item-is-succesvol-geupdatet'),
-					false
+					t('admin/menu/views/menu-edit___het-navigatie-item-is-succesvol-geupdatet')
 				);
 			}
 		} catch (err) {
@@ -322,8 +309,7 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 				})
 			);
 			ToastService.danger(
-				t('admin/menu/views/menu-edit___het-updaten-van-het-navigatie-item-is-mislukt'),
-				false
+				t('admin/menu/views/menu-edit___het-updaten-van-het-navigatie-item-is-mislukt')
 			);
 		}
 		setIsSaving(false);
@@ -351,7 +337,7 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 				menu: menuParentId,
 			});
 		} else {
-			navigate(history, MENU_PATH.MENU);
+			navigate(history, MENU_PATH.MENU_OVERVIEW);
 		}
 	};
 
@@ -361,7 +347,11 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 			<Spinner size="large" />
 		</Flex>
 	) : (
-		<AdminLayout showBackButton pageTitle={pageTitle}>
+		<AdminLayout
+			onClickBackButton={() => navigate(history, ADMIN_PATH.MENU_OVERVIEW)}
+			pageTitle={pageTitle}
+			size="large"
+		>
 			<AdminLayoutTopBarRight>
 				<ButtonToolbar>
 					<Button
@@ -392,18 +382,14 @@ const MenuEdit: FunctionComponent<MenuEditProps> = ({ history, match }) => {
 					</title>
 					<meta name="description" content={get(menuForm, 'description') || ''} />
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<MenuEditForm
-							formErrors={formErrors}
-							formState={menuForm}
-							menuParentId={menuParentId}
-							menuParentOptions={menuParentOptions}
-							onChange={handleChange}
-							permissionWarning={permissionWarning}
-						/>
-					</Container>
-				</Container>
+				<MenuEditForm
+					formErrors={formErrors}
+					formState={menuForm}
+					menuParentId={menuParentId}
+					menuParentOptions={menuParentOptions}
+					onChange={handleChange}
+					permissionWarning={permissionWarning}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

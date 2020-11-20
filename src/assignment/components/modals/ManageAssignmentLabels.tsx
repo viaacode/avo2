@@ -119,31 +119,31 @@ const ManageAssignmentLabels: FunctionComponent<ManageAssignmentLabelsProps> = (
 	};
 
 	const handleRowDelete = (id: number) => {
-		setAssignmentLabels([...assignmentLabels.filter(labelObj => labelObj.id !== id)]);
+		setAssignmentLabels([...assignmentLabels.filter((labelObj) => labelObj.id !== id)]);
 	};
 
 	const handleSaveLabels = async () => {
 		try {
 			setIsProcessing(true);
-			const initialAssignmentLabelIds = initialAssignmentLabels.map(l => l.id);
-			const updatedAssignmentLabelIds = assignmentLabels.map(l => l.id);
+			const initialAssignmentLabelIds = initialAssignmentLabels.map((l) => l.id);
+			const updatedAssignmentLabelIds = assignmentLabels.map((l) => l.id);
 
 			const newIds = without(updatedAssignmentLabelIds, ...initialAssignmentLabelIds);
 			const oldIds = without(initialAssignmentLabelIds, ...updatedAssignmentLabelIds);
 			const updatedIds = intersection(initialAssignmentLabelIds, updatedAssignmentLabelIds);
 
 			const newLabels = compact(
-				newIds.map(newId => assignmentLabels.find(l => l.id === newId))
+				newIds.map((newId) => assignmentLabels.find((l) => l.id === newId))
 			);
 			const updatedLabels = compact(
-				updatedIds.map(updatedId => assignmentLabels.find(l => l.id === updatedId))
+				updatedIds.map((updatedId) => assignmentLabels.find((l) => l.id === updatedId))
 			);
 
 			const profileId = get(user, 'profile.id');
 			await Promise.all([
 				AssignmentLabelsService.insertLabels(newLabels),
 				AssignmentLabelsService.deleteLabels(profileId, oldIds),
-				updatedLabels.map(l =>
+				updatedLabels.map((l) =>
 					AssignmentLabelsService.updateLabel(
 						profileId,
 						l.id,
@@ -176,7 +176,7 @@ const ManageAssignmentLabels: FunctionComponent<ManageAssignmentLabelsProps> = (
 
 	const renderCell = (rowData: any, columnId: string) => {
 		const assignmentLabel = rowData as Avo.Assignment.Label;
-		const colorOptions = assignmentLabelColors.map(assignmentLabelColor => ({
+		const colorOptions = assignmentLabelColors.map((assignmentLabelColor) => ({
 			label: '',
 			value: assignmentLabelColor.value,
 			color: assignmentLabelColor.label,
@@ -188,10 +188,12 @@ const ManageAssignmentLabels: FunctionComponent<ManageAssignmentLabelsProps> = (
 						<ColorSelect
 							options={colorOptions}
 							value={colorOptions.find(
-								colorOption =>
+								(colorOption) =>
 									colorOption.value === assignmentLabel.color_enum_value
 							)}
-							onChange={newColor => handleRowColorChanged(assignmentLabel, newColor)}
+							onChange={(newColor) =>
+								handleRowColorChanged(assignmentLabel, newColor)
+							}
 						/>
 					</Spacer>
 				);
@@ -201,7 +203,9 @@ const ManageAssignmentLabels: FunctionComponent<ManageAssignmentLabelsProps> = (
 					<Spacer margin="right-small">
 						<TextInput
 							value={assignmentLabel.label || ''}
-							onChange={newLabel => handleRowLabelChanged(assignmentLabel, newLabel)}
+							onChange={(newLabel) =>
+								handleRowLabelChanged(assignmentLabel, newLabel)
+							}
 						/>
 					</Spacer>
 				);

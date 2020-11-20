@@ -1,6 +1,7 @@
 .c-filter-table {
 
-	.c-dropdown__trigger {
+	.c-dropdown__trigger,
+	.c-checkbox-dropdown__trigger {
 		margin-bottom: 0.8rem;
 	}
 
@@ -10,5 +11,28 @@
 
 	.c-content-filters__search {
 		max-width: 400px;
+	}
+
+	.c-bulk-action-select {
+		min-width: 200px;
+	}
+
+	.c-filter-table__loading-wrapper {
+		position: relative;
+
+		.c-filter-table__loading {
+			position: absolute;
+			left: 0;
+			top: 0;
+			right: 0;
+			width: auto;
+			height: auto;
+		}
+	}
+
+	.c-filter-table__toolbar {
+		.c-toolbar__left {
+			max-width: calc(100% - 200px);
+		}
 	}
 }

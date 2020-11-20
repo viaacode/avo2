@@ -1,22 +1,23 @@
 import { Avo } from '@viaa/avo2-types';
 
 const mockUser: Avo.User.User = {
-	id: 64,
 	first_name: 'Bert',
 	last_name: 'Verhelst',
+	full_name: 'Bert Verhelst',
 	created_at: '2019-10-23T16:21:17.984884+00:00',
 	expires_at: null,
 	external_uid: null,
 	role_id: 1,
 	role: { id: 1, label: 'Beheerder', name: 'admin' },
-	type: null,
 	uid: '517aec71-cf0e-4e08-99d1-8e7e042923f7',
 	updated_at: '2019-10-23T16:21:17.984884+00:00',
 	mail: 'bert.verhelst@studiohyperdrive.be',
+	is_blocked: null,
 	idpmaps: [],
 	profile: {
 		id: '69ccef3b-751a-4be4-95bc-5ef365fbd504',
 		alias: 'bert',
+		title: 'developer',
 		alternative_email: 'verhelstbert@gmail.com',
 		avatar: null,
 		created_at: '2019-10-23T16:22:47.543339+00:00',
@@ -24,14 +25,17 @@ const mockUser: Avo.User.User = {
 		bio: 'bert de shd developer',
 		updated_at: '2019-10-23T16:22:47.543339+00:00',
 		user_id: '517aec71-cf0e-4e08-99d1-8e7e042923f7',
-		// profile_user_group: null,
+		// profile_user_groups: null,
 		educationLevels: ['Lager onderwijs', 'Hoger onderwijs'],
 		subjects: ['lichamelijke opvoeding', 'sociale vaardigheden'],
 		organizations: [{ organizationName: 'test school', unitAddress: 'test straat' }],
 		user: {} as any,
 		userGroupIds: [],
 		permissions: [],
-	} as any, // Remove cast after update to typings 2.17.0
-} as any; // Remove cast after update to typings 2.17.0
+		company_id: null,
+		organisation: null,
+		is_exception: false,
+	},
+} as any; // TODO remove cast after update to typings v2.24.0
 
 export default mockUser;

@@ -4,8 +4,8 @@ import React, { ReactNode } from 'react';
 import { Avatar, AvatarList, AvatarProps } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-const getProfile = (
-	obj: Avo.User.Profile | Avo.User.User | null | undefined
+export const getProfile = (
+	obj: Avo.User.Profile | { profile: Avo.User.Profile } | null | undefined
 ): Avo.User.Profile | null => {
 	if (!obj) {
 		return null;
@@ -25,7 +25,11 @@ export const getInitials = (profile: Avo.User.Profile | null) =>
 	getInitialChar(get(profile, 'user.first_name')) +
 	getInitialChar(get(profile, 'user.last_name'));
 
-export const getFullName = (userOrProfile: Avo.User.Profile | Avo.User.User | null | undefined) => {
+export const getFullName = (
+	userOrProfile: Avo.User.Profile | { profile: Avo.User.Profile } | null | undefined,
+	includeCompany: boolean,
+	includeEmail: boolean
+): string | null => {
 	if (!userOrProfile) {
 		return null;
 	}
@@ -34,9 +38,13 @@ export const getFullName = (userOrProfile: Avo.User.Profile | Avo.User.User | nu
 
 	const firstName = get(profile, 'user.first_name');
 	const lastName = get(profile, 'user.last_name');
-	const organisationName = get(profile, 'organisation.name');
+	const fullName = get(profile, 'user.full_name') || `${firstName} ${lastName}`;
+	const email = includeEmail ? get(profile, 'user.mail') : '';
+	const organisationName = includeCompany ? get(profile, 'organisation.name') : '';
 
-	return `${firstName} ${lastName}${organisationName ? ` (${organisationName})` : ''}`;
+	return `${fullName}${organisationName ? ` (${organisationName})` : ''}${
+		includeEmail ? ` (${email})` : ''
+	}`;
 };
 
 export const getAbbreviatedFullName = (profile: Avo.User.Profile | null) =>
@@ -54,7 +62,7 @@ export const getAvatarProps = (
 ): AvatarProps => {
 	const name: string = options.abbreviatedName
 		? getAbbreviatedFullName(profile)
-		: getFullName(profile) || '';
+		: getFullName(profile, true, false) || '';
 
 	return {
 		name,
@@ -65,7 +73,7 @@ export const getAvatarProps = (
 };
 
 export const renderAvatar = (
-	userOrProfile: Avo.User.User | Avo.User.Profile | null,
+	userOrProfile: Avo.User.Profile | { profile: Avo.User.Profile } | null,
 	options: {
 		small?: boolean;
 		abbreviatedName?: boolean;

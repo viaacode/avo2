@@ -9,6 +9,7 @@ import {
 	Button,
 	ButtonToolbar,
 	Container,
+	LinkTarget,
 	Panel,
 	PanelBody,
 	PanelHeader,
@@ -23,7 +24,8 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
-import { buildLink, CustomError, formatDate } from '../../../shared/helpers';
+import SmartLink from '../../../shared/components/SmartLink/SmartLink';
+import { buildLink, CustomError, formatDate, navigate } from '../../../shared/helpers';
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { useTableSort } from '../../../shared/hooks';
 import { ToastService } from '../../../shared/services';
@@ -52,7 +54,8 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
 	const [sortColumn, sortOrder, handleSortClick] = useTableSort<PermissionGroupTableCols>(
-		'label'
+		'label',
+		'asc'
 	);
 
 	const [t] = useTranslation();
@@ -130,8 +133,7 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 			}
 			await UserGroupService.deleteUserGroup(userGroup.id);
 			ToastService.success(
-				t('admin/user-groups/views/user-group-detail___de-gebruikersgroep-is-verwijdert'),
-				false
+				t('admin/user-groups/views/user-group-detail___de-gebruikersgroep-is-verwijdert')
 			);
 			redirectToClientPage(ADMIN_PATH.USER_GROUP_OVERVIEW, history);
 		} catch (err) {
@@ -139,8 +141,7 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-detail___het-verwijderen-van-de-gebruikersgroep-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
@@ -168,24 +169,27 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 			case 'actions':
 				return (
 					<ButtonToolbar>
-						{/* TODO add link to permission group edit page */}
-						<Button
-							icon="edit"
-							onClick={() =>
-								ToastService.info(
-									t('settings/components/profile___nog-niet-geimplementeerd'),
-									false
-								)
-							}
-							size="small"
-							ariaLabel={t(
-								'admin/user-groups/views/user-group-detail___verwijder-deze-gebruikersgroep'
-							)}
-							title={t(
-								'admin/user-groups/views/user-group-detail___verwijder-deze-gebruikersgroep'
-							)}
-							type="tertiary"
-						/>
+						<SmartLink
+							action={{
+								type: 'INTERNAL_LINK',
+								target: LinkTarget.Self,
+								value: buildLink(ADMIN_PATH.PERMISSION_GROUP_EDIT, {
+									id: rowData.id,
+								}),
+							}}
+						>
+							<Button
+								icon="edit"
+								size="small"
+								ariaLabel={t(
+									'admin/permission-groups/views/permission-group-detail___bewerk-deze-permissie-groep'
+								)}
+								title={t(
+									'admin/permission-groups/views/permission-group-detail___bewerk-deze-permissie-groep'
+								)}
+								type="tertiary"
+							/>
+						</SmartLink>
 					</ButtonToolbar>
 				);
 
@@ -205,7 +209,7 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 		}
 		return (
 			<Container mode="vertical" size="small">
-				<Container mode="horizontal">
+				<Container mode="horizontal" size="full-width">
 					<Spacer margin="bottom-extra-large">
 						<Table horizontal variant="invisible" className="c-table_detail-page">
 							<tbody>
@@ -255,7 +259,7 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 								emptyStateMessage={t(
 									'admin/user-groups/views/user-group-detail___deze-gebruikersgroep-is-nog-niet-gelinked-aan-een-permissiegroep'
 								)}
-								onColumnClick={columId =>
+								onColumnClick={(columId) =>
 									handleSortClick(columId as PermissionGroupTableCols)
 								}
 								renderCell={(rowData: UserGroup, columnId: string) =>
@@ -275,8 +279,9 @@ const UserGroupDetail: FunctionComponent<UserDetailProps> = ({ history, match })
 
 	const renderUserDetailPage = () => (
 		<AdminLayout
-			showBackButton
+			onClickBackButton={() => navigate(history, ADMIN_PATH.USER_GROUP_OVERVIEW)}
 			pageTitle={t('admin/user-groups/views/user-group-detail___gebruikersgroep-details')}
+			size="full-width"
 		>
 			<AdminLayoutTopBarRight>
 				<ButtonToolbar>

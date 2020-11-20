@@ -14,6 +14,7 @@ export const ROUTE_PARTS = Object.freeze({
 	bundles: 'bundels',
 	item: 'item',
 	items: 'items',
+	publishItems: 'items-publiceren',
 	login: 'login',
 	logout: 'uitloggen',
 	manualAccessRequest: 'manuele-toegangsaanvraag',

@@ -1,3 +1,47 @@
-.c-filter-dropdown-broadcastdate .c-dropdown__menu {
-	overflow: visible !important;
+.c-filter-dropdown-broadcastdate {
+
+	.c-dropdown__menu {
+		max-width: 80vw;
+		overflow: visible !important;
+	}
 }
+
+.c-search-view {
+	.c-accordion__body {
+		padding-top: 10px;
+	}
+}
+
+.c-filter-dropdown-list.c-filter-dropdown-list--mobile {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	margin-bottom: 0;
+
+	> li {
+		> .c-checkbox-dropdown__trigger,
+		> .c-dropdown__trigger {
+			display: block;
+			width: 100%;
+
+			> button {
+				width: 100%;
+
+				.c-button__label {
+					line-height: 40px;
+				}
+			}
+		}
+	}
+
+	.c-filter-dropdown {
+		margin-right: 0;
+	}
+}
+
+.c-accordion--filters > {
+	.c-checkbox-dropdown-modal__trigger {
+		width: 100%;
+	}
+}
+

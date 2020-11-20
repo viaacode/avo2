@@ -29,17 +29,8 @@ describe('Formatters - date', () => {
 	});
 
 	it('should make humanly readable', () => {
-		expect(
-			fromNow(
-				moment()
-					.subtract(2, 'hours')
-					.toDate()
-					.toISOString()
-			)
-		).toEqual(
-			moment()
-				.subtract(2, 'hours')
-				.fromNow()
+		expect(fromNow(moment().subtract(2, 'hours').toDate().toISOString())).toEqual(
+			moment().subtract(2, 'hours').fromNow()
 		);
 	});
 });

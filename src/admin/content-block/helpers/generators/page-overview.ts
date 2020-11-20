@@ -11,6 +11,7 @@ import {
 } from '../../../shared/types';
 import {
 	GET_PAGE_OVERVIEW_ITEM_STYLE_OPTIONS,
+	GET_PAGE_OVERVIEW_ORDER_OPTIONS,
 	GET_PAGE_OVERVIEW_TAB_STYLE_OPTIONS,
 } from '../../content-block.const';
 
@@ -141,6 +142,15 @@ export const PAGE_OVERVIEW_BLOCK_CONFIG = (position: number = 0): ContentBlockCo
 		block: {
 			state: INITIAL_PAGE_OVERVIEW_BLOCK_STATE(),
 			fields: {
+				sortOrder: {
+					label: i18n.t(
+						'admin/content-block/helpers/generators/page-overview___sorteer-volgorde'
+					),
+					editorType: ContentBlockEditor.Select,
+					editorProps: {
+						options: GET_PAGE_OVERVIEW_ORDER_OPTIONS(),
+					},
+				},
 				headerBackgroundColor: BACKGROUND_COLOR_FIELD(
 					i18n.t(
 						'admin/content-block/helpers/generators/defaults___titelbalk-achtergrondkleur'

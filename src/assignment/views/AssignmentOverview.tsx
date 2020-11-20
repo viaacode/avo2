@@ -9,15 +9,11 @@ import {
 	ButtonGroup,
 	ButtonToolbar,
 	Checkbox,
-	Dropdown,
-	DropdownButton,
-	DropdownContent,
 	Flex,
 	Form,
 	FormGroup,
 	Icon,
 	IconName,
-	MenuContent,
 	Pagination,
 	Select,
 	Spacer,
@@ -32,6 +28,7 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
+import { getProfileName } from '../../authentication/helpers/get-profile-info';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import { APP_PATH } from '../../constants';
 import { ErrorView } from '../../error/views';
@@ -43,11 +40,11 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../shared/components';
+import MoreOptionsDropdown from '../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
 import {
 	buildLink,
 	CustomError,
 	formatTimestamp,
-	fromNow,
 	isMobileWidth,
 	navigate,
 	renderAvatar,
@@ -55,8 +52,8 @@ import {
 import { truncateTableValue } from '../../shared/helpers/truncate';
 import { useTableSort } from '../../shared/hooks';
 import { AssignmentLabelsService, ToastService } from '../../shared/services';
+import { trackEvents } from '../../shared/services/event-logging-service';
 import { ITEMS_PER_PAGE } from '../../workspace/workspace.const';
-import { TABLE_COLUMN_TO_DATABASE_ORDER_OBJECT } from '../assignment.const';
 import { AssignmentService } from '../assignment.service';
 import { AssignmentColumn, AssignmentOverviewTableColumns } from '../assignment.types';
 
@@ -129,11 +126,9 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 				user,
 				canEditAssignments ? activeView === 'archived_assignments' : false, // Teachers can see archived assignments
 				canEditAssignments ? null : activeView === 'archived_assignments', // pupils can see assignments past deadline
-				TABLE_COLUMN_TO_DATABASE_ORDER_OBJECT[sortColumn]
-					? (TABLE_COLUMN_TO_DATABASE_ORDER_OBJECT[sortColumn] as Function)(sortOrder)
-					: {
-							[sortColumn]: sortOrder,
-					  },
+				{
+					[sortColumn]: sortOrder,
+				},
 				page,
 				filterString,
 				selectedAssignmentLabelsIds
@@ -272,6 +267,17 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 				return;
 			}
 			await AssignmentService.deleteAssignment(assignmentId);
+
+			trackEvents(
+				{
+					object: String(assignmentId),
+					object_type: 'assignment',
+					message: `Gebruiker ${getProfileName(user)} heeft een opdracht verwijderd`,
+					action: 'delete',
+				},
+				user
+			);
+
 			await fetchAssignments();
 			onUpdate();
 			ToastService.success(
@@ -291,6 +297,7 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 		actionId: ExtraAssignmentOptions,
 		dataRow: Avo.Assignment.Assignment
 	) => {
+		setDropdownOpenForAssignmentId(null);
 		if (!dataRow.id) {
 			ToastService.danger(
 				t(
@@ -332,8 +339,6 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 			default:
 				return null;
 		}
-
-		setDropdownOpenForAssignmentId(null);
 	};
 
 	const handleDeleteModalClose = () => {
@@ -397,64 +402,42 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 		return (
 			<ButtonToolbar>
 				{canEditAssignments && (
-					<Dropdown
+					<MoreOptionsDropdown
 						isOpen={dropdownOpenForAssignmentId === rowData.id}
-						menuWidth="fit-content"
-						onClose={() => setDropdownOpenForAssignmentId(null)}
 						onOpen={() => setDropdownOpenForAssignmentId(rowData.id)}
-						placement="bottom-end"
-					>
-						<DropdownButton>
-							<Button
-								icon="more-horizontal"
-								type={isMobileWidth() ? 'tertiary' : 'borderless'}
-								title={t('assignment/views/assignment-overview___meer-opties')}
-							/>
-						</DropdownButton>
-						<DropdownContent>
-							<MenuContent
-								menuItems={[
-									{
-										icon: 'edit2' as IconName,
-										id: 'edit',
-										label: t('assignment/views/assignment-overview___bewerk'),
-									},
-									{
-										icon: 'archive' as IconName,
-										id: 'archive',
-										label:
-											activeView === 'archived_assignments'
-												? t(
-														'assignment/views/assignment-overview___dearchiveer'
-												  )
-												: t(
-														'assignment/views/assignment-overview___archiveer'
-												  ),
-									},
-									{
-										icon: 'copy' as IconName,
-										id: 'duplicate',
-										label: t(
-											'assignment/views/assignment-overview___dupliceer'
-										),
-									},
-									{
-										icon: 'delete' as IconName,
-										id: 'delete',
-										label: t(
-											'assignment/views/assignment-overview___verwijder'
-										),
-									},
-								]}
-								onClick={(actionId: ReactText) =>
-									handleExtraOptionsItemClicked(
-										actionId.toString() as ExtraAssignmentOptions,
-										rowData
-									)
-								}
-							/>
-						</DropdownContent>
-					</Dropdown>
+						onClose={() => setDropdownOpenForAssignmentId(null)}
+						menuItems={[
+							{
+								icon: 'edit2' as IconName,
+								id: 'edit',
+								label: t('assignment/views/assignment-overview___bewerk'),
+							},
+							{
+								icon: 'archive' as IconName,
+								id: 'archive',
+								label:
+									activeView === 'archived_assignments'
+										? t('assignment/views/assignment-overview___dearchiveer')
+										: t('assignment/views/assignment-overview___archiveer'),
+							},
+							{
+								icon: 'copy' as IconName,
+								id: 'duplicate',
+								label: t('assignment/views/assignment-overview___dupliceer'),
+							},
+							{
+								icon: 'delete' as IconName,
+								id: 'delete',
+								label: t('assignment/views/assignment-overview___verwijder'),
+							},
+						]}
+						onOptionClicked={(actionId: ReactText) =>
+							handleExtraOptionsItemClicked(
+								actionId.toString() as ExtraAssignmentOptions,
+								rowData
+							)
+						}
+					/>
 				)}
 
 				{canEditAssignments && (
@@ -557,20 +540,8 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 					renderAvatar(profile, avatarOptions)
 				);
 
-			case 'class_room':
-				return cellData;
-
 			case 'deadline_at':
-				return isMobileWidth() ? (
-					<Flex>
-						<Spacer margin="right">
-							<Icon name="clock" subtle />
-						</Spacer>
-						<span title={formatTimestamp(cellData)}>{fromNow(cellData)}</span>
-					</Flex>
-				) : (
-					<span title={formatTimestamp(cellData)}>{fromNow(cellData)}</span>
-				);
+				return formatTimestamp(cellData, false);
 
 			case 'assignment_responses':
 				return (
@@ -583,6 +554,13 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 
 			case 'submitted_at':
 				const isSubmitted = !!get(assignment, 'assignment_responses[0].submitted_at');
+
+				if (activeView === 'archived_assignments') {
+					return isSubmitted
+						? t('assignment/views/assignment-overview___gemaakt')
+						: t('assignment/views/assignment-overview___niet-gemaakt');
+				}
+
 				const checkbox = (
 					<Checkbox
 						checked={isSubmitted}
@@ -603,14 +581,20 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 				}
 				return renderActions(assignment);
 
+			case 'class_room': // fallthrough
 			default:
 				return cellData;
 		}
 	};
 
 	const columns: AssignmentColumn[] = [
-		{ id: 'title', label: t('assignment/views/assignment-overview___titel'), sortable: true },
-		// { id: 'assignment_type', label: t('assignment/views/assignment-overview___type'), sortable: true }, // https://district01.atlassian.net/browse/AVO2-421
+		{
+			id: 'title',
+			label: t('assignment/views/assignment-overview___titel'),
+			sortable: true,
+			visibleByDefault: true,
+		},
+		// { id: 'assignment_type', label: t('assignment/views/assignment-overview___type'), sortable: true, visibleByDefault: true }, // https://district01.atlassian.net/browse/AVO2-421
 		...(isMobileWidth()
 			? []
 			: [
@@ -627,6 +611,7 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 						id: 'author',
 						label: t('assignment/views/assignment-overview___leerkracht'),
 						sortable: true,
+						visibleByDefault: true,
 					},
 			  ]), // Only show teacher for pupils
 		...(isMobileWidth()
@@ -636,12 +621,14 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 						id: 'class_room',
 						label: t('assignment/views/assignment-overview___klas'),
 						sortable: true,
+						visibleByDefault: true,
 					},
 			  ]),
 		{
 			id: 'deadline_at',
 			label: t('assignment/views/assignment-overview___deadline'),
 			sortable: true,
+			visibleByDefault: true,
 		},
 		...(canEditAssignments
 			? []
@@ -653,6 +640,7 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 							'assignment/views/assignment-overview___heb-je-deze-opdracht-reeds-ingediend'
 						),
 						sortable: true,
+						visibleByDefault: true,
 					},
 			  ]), // Only show teacher for pupils
 		// { id: 'assignment_responses', label: t('assignment/views/assignment-overview___indieningen') }, // https://district01.atlassian.net/browse/AVO2-421
@@ -705,7 +693,7 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 										},
 									]}
 									value={activeView}
-									onChange={activeViewId =>
+									onChange={(activeViewId) =>
 										setActiveView(activeViewId as Avo.Assignment.View)
 									}
 									className="c-assignment-overview__archive-select"
@@ -894,7 +882,7 @@ const AssignmentOverview: FunctionComponent<AssignmentOverviewProps> = ({
 					}
 					rowKey="id"
 					variant="styled"
-					onColumnClick={columnId =>
+					onColumnClick={(columnId) =>
 						handleColumnClick(columnId as AssignmentOverviewTableColumns)
 					}
 					sortColumn={sortColumn}

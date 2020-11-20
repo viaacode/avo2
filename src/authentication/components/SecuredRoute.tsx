@@ -1,4 +1,3 @@
-import queryString from 'query-string';
 import React, { ComponentType, FunctionComponent, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { connect } from 'react-redux';
@@ -71,13 +70,13 @@ const SecuredRoute: FunctionComponent<SecuredRouteProps> = ({
 			buildLink(
 				APP_PATH.ERROR.route,
 				{},
-				queryString.stringify({
+				{
 					message: t(
 						'authentication/components/secured-route___het-inloggen-is-mislukt-controleer-je-internet-verbinding-of-probeer-later-opnieuw'
 					),
 					icon: 'alert-triangle',
 					actionButtons: 'home, helpdesk',
-				})
+				}
 			),
 			history
 		);
@@ -88,7 +87,7 @@ const SecuredRoute: FunctionComponent<SecuredRouteProps> = ({
 		<Route
 			{...(path ? { path } : {})}
 			exact={exact}
-			render={props => {
+			render={(props) => {
 				// Already logged in
 				if (loginState && loginState.message === LoginMessage.LOGGED_IN && user) {
 					if (!loginState.acceptedConditions) {

@@ -1,7 +1,7 @@
 import produce, { Draft } from 'immer';
 import { cloneDeep } from 'lodash-es';
 
-import { RichEditorState } from '@viaa/avo2-components';
+import { RichEditorState } from '@viaa/avo2-components/dist/esm/wysiwyg';
 import { Avo } from '@viaa/avo2-types';
 
 import { ToastService } from '../../../../shared/services';
@@ -74,8 +74,7 @@ export const interactiveTourEditReducer = produce(
 			ToastService.danger(
 				i18n.t(
 					'admin/interactive-tour/views/interactive-tour-edit___de-interactieve-tour-is-nog-niet-geladen'
-				),
-				false
+				)
 			);
 			return;
 		}

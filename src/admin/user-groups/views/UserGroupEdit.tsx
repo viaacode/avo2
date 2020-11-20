@@ -33,6 +33,7 @@ import { buildLink, CustomError, formatDate, navigate } from '../../../shared/he
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { useTableSort } from '../../../shared/hooks';
 import { ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import { PermissionGroupService } from '../../permission-groups/permission-group.service';
 import { Permission, PermissionGroup } from '../../permission-groups/permission-group.types';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
@@ -138,8 +139,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-edit___het-ophalen-van-alle-permissies-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	}, [setAllPermissionGroups, t]);
@@ -186,7 +186,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 		setUserGroup({
 			...userGroup,
 			permissionGroups: (userGroup.permissionGroups || []).filter(
-				permissionGroup => permissionGroup.id !== permissionGroupIdToDelete
+				(permissionGroup) => permissionGroup.id !== permissionGroupIdToDelete
 			),
 		});
 	};
@@ -197,26 +197,24 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 		}
 		if (
 			(userGroup.permissionGroups || []).find(
-				pg => String(pg.id) === selectedPermissionGroupId
+				(pg) => String(pg.id) === selectedPermissionGroupId
 			)
 		) {
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-edit___deze-gebruikersgroep-zit-reeds-in-de-groep'
-				),
-				false
+				)
 			);
 			return;
 		}
 		const selectedPermission = allPermissionGroups.find(
-			pg => String(pg.id) === selectedPermissionGroupId
+			(pg) => String(pg.id) === selectedPermissionGroupId
 		);
 		if (!selectedPermission) {
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-edit___de-geselecteerde-gebruikersgroep-kon-niet-worden-gevonden'
-				),
-				false
+				)
 			);
 			return;
 		}
@@ -226,8 +224,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 		});
 		setSelectedPermissionGroupId(null);
 		ToastService.success(
-			t('admin/user-groups/views/user-group-edit___permissie-groep-tegevoegd'),
-			false
+			t('admin/user-groups/views/user-group-edit___permissie-groep-tegevoegd')
 		);
 	};
 
@@ -237,8 +234,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 			setFormErrors(errors || {});
 			if (errors) {
 				ToastService.danger(
-					t('admin/user-groups/views/user-group-edit___de-invoer-is-ongeldig'),
-					false
+					t('admin/user-groups/views/user-group-edit___de-invoer-is-ongeldig')
 				);
 				return;
 			}
@@ -247,8 +243,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 				ToastService.danger(
 					t(
 						'admin/user-groups/views/user-group-edit___het-opslaan-van-de-permissie-groep-is-mislukt-omdat-de-permissie-groep-nog-niet-is-geladen'
-					),
-					false
+					)
 				);
 				return;
 			}
@@ -275,25 +270,20 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 			);
 
 			await UserGroupService.addPermissionGroupsToUserGroup(
-				addedPermissions.map(p => p.id) as number[],
+				addedPermissions.map((p) => p.id) as number[],
 				userGroupId
 			);
 			await UserGroupService.removePermissionGroupsFromUserGroup(
-				removedPermissions.map(p => p.id) as number[],
+				removedPermissions.map((p) => p.id) as number[],
 				userGroupId
 			);
 
-			if (isCreatePage) {
-				redirectToClientPage(
-					buildLink(USER_GROUP_PATH.USER_GROUP_EDIT, { id: userGroupId }),
-					history
-				);
-			} else {
-				await initOrFetchUserGroup();
-			}
+			redirectToClientPage(
+				buildLink(USER_GROUP_PATH.USER_GROUP_DETAIL, { id: userGroupId }),
+				history
+			);
 			ToastService.success(
-				t('admin/user-groups/views/user-group-edit___de-gebruikersgroep-is-opgeslagen'),
-				false
+				t('admin/user-groups/views/user-group-edit___de-gebruikersgroep-is-opgeslagen')
 			);
 		} catch (err) {
 			console.error(
@@ -305,8 +295,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-edit___het-opslaan-van-de-gebruikersgroep-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 		setIsSaving(false);
@@ -314,14 +303,16 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 
 	const getAllPermissionGroups = () => {
 		const permissionGroupIdsInUserGroup: number[] = compact(
-			(get(userGroup, 'permissionGroups', []) as Partial<PermissionGroup>[]).map(pg => pg.id)
+			(get(userGroup, 'permissionGroups', []) as Partial<PermissionGroup>[]).map(
+				(pg) => pg.id
+			)
 		);
 		return allPermissionGroups
-			.filter(p => {
+			.filter((p) => {
 				// Don't show permissionGroups that are already linked to this user group
 				return !permissionGroupIdsInUserGroup.includes(p.id as number);
 			})
-			.map(pg => ({
+			.map((pg) => ({
 				label: pg.label || pg.description || '',
 				value: String(pg.id),
 			}));
@@ -342,9 +333,6 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 						})}
 					</div>
 				);
-
-			case 'description':
-				return rowData[columnId];
 
 			case 'created_at':
 			case 'updated_at':
@@ -368,6 +356,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 					</ButtonToolbar>
 				);
 
+			case 'description': // fallthrough
 			default:
 				return rowData[columnId];
 		}
@@ -390,7 +379,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 								>
 									<TextInput
 										value={userGroup.label || ''}
-										onChange={newLabel =>
+										onChange={(newLabel) =>
 											setUserGroup({
 												...userGroup,
 												label: newLabel,
@@ -406,7 +395,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 								>
 									<TextInput
 										value={userGroup.description || ''}
-										onChange={newDescription =>
+										onChange={(newDescription) =>
 											setUserGroup({
 												...userGroup,
 												description: newDescription,
@@ -470,7 +459,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 							emptyStateMessage={t(
 								'admin/user-groups/views/user-group-edit___deze-gebruikersgroep-is-nog-niet-gelinked-aan-een-permissiegroep'
 							)}
-							onColumnClick={columId =>
+							onColumnClick={(columId) =>
 								handleSortClick(columId as PermissionGroupTableCols)
 							}
 							renderCell={(rowData: UserGroup, columnId: string) =>
@@ -499,8 +488,9 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 		}
 		return (
 			<AdminLayout
-				showBackButton
+				onClickBackButton={() => navigate(history, ADMIN_PATH.USER_GROUP_OVERVIEW)}
 				pageTitle={t('admin/user-groups/views/user-group-edit___gebruikersgroep-aanpassen')}
+				size="large"
 			>
 				{' '}
 				<AdminLayoutTopBarRight>
@@ -517,11 +507,7 @@ const UserGroupEdit: FunctionComponent<UserGroupEditProps> = ({ history, match, 
 						/>
 					</ButtonToolbar>
 				</AdminLayoutTopBarRight>
-				<AdminLayoutBody>
-					<Container mode="vertical" size="small">
-						<Container mode="horizontal">{renderEditPage()}</Container>
-					</Container>
-				</AdminLayoutBody>
+				<AdminLayoutBody>{renderEditPage()}</AdminLayoutBody>
 			</AdminLayout>
 		);
 	};

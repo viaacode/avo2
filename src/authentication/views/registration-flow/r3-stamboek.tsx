@@ -32,11 +32,7 @@ export type StamboekValidationStatus =
 
 export const STAMBOEK_LOCAL_STORAGE_KEY = 'AVO.stamboek';
 
-const RegisterStamboek: FunctionComponent<RegisterStamboekProps> = ({
-	history,
-	location,
-	...props
-}) => {
+const RegisterStamboek: FunctionComponent<RegisterStamboekProps> = ({ location }) => {
 	const [t] = useTranslation();
 
 	const [validStamboekNumber, setValidStamboekNumber] = useState<string>('');
@@ -47,7 +43,9 @@ const RegisterStamboek: FunctionComponent<RegisterStamboekProps> = ({
 			redirectToServerArchiefRegistrationIdp(location, validStamboekNumber);
 		} else {
 			ToastService.danger(
-				'Je moet de privacy voorwaarden accepteren om een account te kunnen aanmaken'
+				t(
+					'authentication/views/registration-flow/r-3-stamboek___je-moet-de-privacy-voorwaarden-accepteren-om-een-account-te-kunnen-aanmaken'
+				)
 			);
 		}
 	};
@@ -103,12 +101,7 @@ const RegisterStamboek: FunctionComponent<RegisterStamboekProps> = ({
 						labelFor="stamboekInput"
 						required
 					>
-						<StamboekInput
-							onChange={setValidStamboekNumber}
-							history={history}
-							location={location}
-							{...props}
-						/>
+						<StamboekInput onChange={setValidStamboekNumber} />
 					</FormGroup>
 					<FormGroup>
 						<Checkbox
@@ -118,10 +111,10 @@ const RegisterStamboek: FunctionComponent<RegisterStamboekProps> = ({
 									<a
 										href="//meemoo.be/nl/privacybeleid"
 										target="_blank"
-										rel="noopener noreferrer"
 										title={t(
 											'authentication/views/registration-flow/r-3-stamboek___bekijk-de-privacy-voorwaarden'
 										)}
+										rel="noopener noreferrer"
 									>
 										privacyverklaring
 									</a>

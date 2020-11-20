@@ -2,18 +2,16 @@ import React from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 
-import { Container } from '@viaa/avo2-components';
-
 import { GENERATE_SITE_TITLE } from '../../../constants';
 import i18n from '../../../shared/translations/i18n';
-import { AdminLayout } from '../../shared/layouts';
+import { AdminLayout, AdminLayoutBody } from '../../shared/layouts';
 
 const Dashboard = () => {
 	const [t] = useTranslation();
 
 	return (
-		<AdminLayout pageTitle={i18n.t('admin/dashboard/views/dashboard___dashboard')}>
-			<Container className="u-spacer-top-l" mode="vertical" size="small">
+		<AdminLayout pageTitle={i18n.t('admin/dashboard/views/dashboard___dashboard')} size="large">
+			<AdminLayoutBody>
 				<MetaTags>
 					<title>
 						{GENERATE_SITE_TITLE(
@@ -34,7 +32,7 @@ const Dashboard = () => {
 						aliquid enim dolorum laudantium delectus obcaecati rem. Mollitia?
 					</Trans>
 				</p>
-			</Container>
+			</AdminLayoutBody>
 		</AdminLayout>
 	);
 };

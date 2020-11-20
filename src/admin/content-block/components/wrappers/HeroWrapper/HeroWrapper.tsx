@@ -4,7 +4,7 @@ import { BlockHero, BlockHeroProps } from '@viaa/avo2-components';
 
 import { getEnv } from '../../../../../shared/helpers';
 
-const HeroWrapper: FunctionComponent<BlockHeroProps> = props => {
+const HeroWrapper: FunctionComponent<BlockHeroProps> = (props) => {
 	return (
 		<BlockHero
 			{...props}

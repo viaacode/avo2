@@ -1,31 +1,37 @@
 import React, { FunctionComponent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { RouteComponentProps, withRouter } from 'react-router-dom';
 
+import { Button } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { getProfileName } from '../../../../../authentication/helpers/get-profile-info';
-import { ROUTE_PARTS } from '../../../../../shared/constants';
+import { navigateToContentType } from '../../../../../shared/helpers';
 import { normalizeTimestamp } from '../../../../../shared/helpers/formatters';
 import { ContentPageInfo } from '../../../../content/content.types';
+import { getPublishedDate } from '../../../../content/helpers/get-published-state';
 
 export interface BlockContentPageMetaProps {
 	contentPageInfo: ContentPageInfo;
 }
 
-const BlockContentPageMeta: FunctionComponent<BlockContentPageMetaProps> = ({
+const BlockContentPageMeta: FunctionComponent<BlockContentPageMetaProps & RouteComponentProps> = ({
 	contentPageInfo,
+	history,
 }) => {
 	const [t] = useTranslation();
 
 	const renderLabel = (labelObj: Partial<Avo.ContentPage.Label>) => {
-		return (
-			<Link
-				to={`/${ROUTE_PARTS.news}?label=${labelObj.label}`}
+		return !!(labelObj as any).link_to ? (
+			<Button
+				type="inline-link"
+				onClick={() => navigateToContentType((labelObj as any).link_to, history)}
 				key={`label-link-${labelObj.label}`}
 			>
 				{labelObj.label}
-			</Link>
+			</Button>
+		) : (
+			labelObj.label
 		);
 	};
 
@@ -59,14 +65,13 @@ const BlockContentPageMeta: FunctionComponent<BlockContentPageMetaProps> = ({
 		);
 	};
 
+	const publishedDate = getPublishedDate(contentPageInfo);
 	return (
 		<span>
 			{t(
 				'admin/content-block/components/wrappers/block-content-page-meta/block-content-page-meta___gepubliceerd-op'
 			)}{' '}
-			{normalizeTimestamp(contentPageInfo.updated_at || contentPageInfo.created_at).format(
-				'D MMMM YYYY'
-			)}{' '}
+			{publishedDate ? normalizeTimestamp(publishedDate).local().format('D MMMM YYYY') : '-'}{' '}
 			{renderLabels()}
 			{`${t(
 				'admin/content-block/components/wrappers/block-content-page-meta/block-content-page-meta___door'
@@ -76,4 +81,4 @@ const BlockContentPageMeta: FunctionComponent<BlockContentPageMetaProps> = ({
 	);
 };
 
-export default BlockContentPageMeta;
+export default withRouter(BlockContentPageMeta);

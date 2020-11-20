@@ -20,6 +20,7 @@ export function convertToContentPageInfo(dbContentPage: Avo.ContentPage.Page): C
 		description_html: dbContentPage.description || '',
 		description_state: undefined,
 		seo_description: dbContentPage.seo_description || '',
+		meta_description: dbContentPage.meta_description || '',
 		is_protected: dbContentPage.is_protected,
 		is_public: dbContentPage.is_public,
 		path: dbContentPage.path,
@@ -54,6 +55,7 @@ export function convertToDatabaseContentPage(
 				? contentPageInfo.description_state.toHTML()
 				: contentPageInfo.description_html) || null,
 		seo_description: contentPageInfo.seo_description || null,
+		meta_description: contentPageInfo.meta_description || null,
 		is_protected: contentPageInfo.is_protected,
 		is_public: contentPageInfo.is_public,
 		path: contentPageInfo.path,

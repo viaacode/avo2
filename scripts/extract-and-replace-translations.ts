@@ -45,7 +45,7 @@ function getFormattedKey(filePath: string, key: string) {
 			.replace(/[\\\/]+/g, '/')
 			.split('.')[0]
 			.split(/[\\\/]/g)
-			.map(part => _.kebabCase(part))
+			.map((part) => _.kebabCase(part))
 			.join('/')
 			.toLowerCase()
 			.replace(/(^\/+|\/+$)/g, '')
@@ -59,10 +59,10 @@ function getFormattedKey(filePath: string, key: string) {
 }
 
 function getFormattedTranslation(translation: string) {
-	return translation
-		.trim()
-		.replace(/\t\t(\t)+/g, ' ')
-		.replace(/(\s?(\\n|\\r)\s?)+/g, ' ');
+	if (!translation) {
+		return translation;
+	}
+	return translation.trim().replace(/\t\t(\t)+/g, ' ');
 }
 
 async function getFilesByGlob(globPattern: string): Promise<string[]> {
@@ -234,7 +234,7 @@ function checkTranslationsForKeysAsValue(translationJson: string) {
 	}
 }
 
-async function updateTranslations() {
+async function updateTranslations(): Promise<void> {
 	const onlineTranslations = await getOnlineTranslations();
 
 	// Extract translations from code and replace code by reference to translation key
@@ -266,10 +266,7 @@ async function updateTranslations() {
 		combinedTranslations[key] = onlineTranslations[key] || newTranslations[key];
 	});
 
-	const nlJsonContent = JSON.stringify(sortObject(combinedTranslations), null, 2).replace(
-		/\s*(\\n|\\r)+\s*/g, // replace new line chars with a single space
-		' '
-	);
+	const nlJsonContent = JSON.stringify(sortObject(combinedTranslations), null, 2);
 	checkTranslationsForKeysAsValue(nlJsonContent); // Throws error if any key is found as a value
 
 	fs.writeFileSync(
@@ -286,4 +283,5 @@ async function updateTranslations() {
 	);
 }
 
-updateTranslations().catch(err => console.error('Update of translations failed: ', err));
+// deepcode ignore UsageOfUndefinedReturnValue: False positive
+updateTranslations().catch((err) => console.error('Update of translations failed: ', err));

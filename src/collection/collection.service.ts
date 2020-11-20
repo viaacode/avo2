@@ -1,17 +1,16 @@
-import { ExecutionResult } from '@apollo/react-common';
+import { FetchResult } from 'apollo-link';
 import { cloneDeep, compact, fromPairs, get, isNil, without } from 'lodash-es';
 import queryString from 'query-string';
 
 import { Avo } from '@viaa/avo2-types';
 import { CollectionLabelSchema } from '@viaa/avo2-types/types/collection';
 
-import { getProfileId } from '../authentication/helpers/get-profile-info';
+import { getProfileId } from '../authentication/helpers/get-profile-id';
 import { CustomError, getEnv, performQuery } from '../shared/helpers';
 import { fetchWithLogout } from '../shared/helpers/fetch-with-logout';
 import { isUuid } from '../shared/helpers/uuid';
 import { ApolloCacheManager, dataService, ToastService } from '../shared/services';
 import { RelationService } from '../shared/services/relation-service/relation.service';
-import { RelationType } from '../shared/services/relation-service/relation.types';
 import { VideoStillService } from '../shared/services/video-stills-service';
 import i18n from '../shared/translations/i18n';
 
@@ -24,11 +23,11 @@ import {
 	GET_COLLECTION_BY_ID,
 	GET_COLLECTION_BY_TITLE_OR_DESCRIPTION,
 	GET_COLLECTION_TITLES_BY_OWNER,
-	GET_COLLECTIONS,
 	GET_COLLECTIONS_BY_FRAGMENT_ID,
-	GET_COLLECTIONS_BY_ID,
 	GET_COLLECTIONS_BY_OWNER,
-	GET_COLLECTIONS_BY_TITLE,
+	GET_PUBLIC_COLLECTIONS,
+	GET_PUBLIC_COLLECTIONS_BY_ID,
+	GET_PUBLIC_COLLECTIONS_BY_TITLE,
 	GET_QUALITY_LABELS,
 	INSERT_COLLECTION,
 	INSERT_COLLECTION_FRAGMENTS,
@@ -88,7 +87,7 @@ export class CollectionService {
 			const cleanedCollection = cleanCollectionBeforeSave(newCollection);
 
 			// insert collection
-			const insertResponse: void | ExecutionResult<
+			const insertResponse: void | FetchResult<
 				Avo.Collection.Collection
 			> = await dataService.mutate({
 				mutation: INSERT_COLLECTION,
@@ -139,7 +138,7 @@ export class CollectionService {
 	}
 
 	private static getLabels(
-		collection: Avo.Collection.Collection | null
+		collection: Partial<Avo.Collection.Collection> | null
 	): CollectionLabelSchema[] {
 		return get(collection, 'collection_labels', []) as CollectionLabelSchema[];
 	}
@@ -152,7 +151,7 @@ export class CollectionService {
 	 */
 	public static async updateCollection(
 		initialCollection: Avo.Collection.Collection | null,
-		updatedCollection: Avo.Collection.Collection
+		updatedCollection: Partial<Avo.Collection.Collection>
 	): Promise<Avo.Collection.Collection | null> {
 		try {
 			// abort if updatedCollection is empty
@@ -178,14 +177,14 @@ export class CollectionService {
 				return null;
 			}
 
-			const newCollection: Avo.Collection.Collection = cloneDeep(updatedCollection);
+			const newCollection: Partial<Avo.Collection.Collection> = cloneDeep(updatedCollection);
 
 			// remove custom_title and custom_description if user wants to use the item's original title and description
 			(newCollection.collection_fragments || []).forEach(
 				(fragment: Avo.Collection.Fragment) => {
 					if (!fragment.use_custom_fields) {
-						delete fragment.custom_title;
-						delete fragment.custom_description;
+						fragment.custom_title = null;
+						fragment.custom_description = null;
 					}
 				}
 			);
@@ -196,7 +195,7 @@ export class CollectionService {
 
 			// Fragments to insert do not have an id yet
 			const newFragments = getFragmentsFromCollection(newCollection).filter(
-				fragment => fragment.id < 0 || isNil(fragment.id)
+				(fragment) => fragment.id < 0 || isNil(fragment.id)
 			);
 
 			// delete fragments that were removed from collection
@@ -208,7 +207,10 @@ export class CollectionService {
 			);
 
 			// insert fragments. New fragments do not have a fragment id yet
-			const insertPromise = this.insertFragments(newCollection.id, newFragments);
+			const insertPromise = CollectionService.insertFragments(
+				newCollection.id as string,
+				newFragments
+			);
 
 			// delete fragments
 			const deletePromises = deleteFragmentIds.map((id: number) =>
@@ -275,7 +277,7 @@ export class CollectionService {
 				newCollection
 			);
 
-			await this.updateCollectionProperties(newCollection.id, cleanedCollection);
+			await this.updateCollectionProperties(newCollection.id as string, cleanedCollection);
 
 			// Update collection labels
 			const initialLabels: string[] = this.getLabels(initialCollection).map(
@@ -384,7 +386,7 @@ export class CollectionService {
 			collectionToInsert.is_public = false;
 
 			// remove id from duplicate
-			delete collectionToInsert.id;
+			delete (collectionToInsert as any).id;
 
 			try {
 				collectionToInsert.title = await this.getCopyTitleForCollection(
@@ -418,9 +420,9 @@ export class CollectionService {
 
 			await RelationService.insertRelation(
 				'collection',
-				collection.id,
 				duplicatedCollection.id,
-				RelationType.IS_COPY_OF
+				'IS_COPY_OF',
+				collection.id
 			);
 
 			return duplicatedCollection;
@@ -448,7 +450,7 @@ export class CollectionService {
 		try {
 			// retrieve collections
 			const response = await dataService.query({
-				query: GET_COLLECTIONS,
+				query: GET_PUBLIC_COLLECTIONS,
 				variables: { limit, typeId },
 			});
 
@@ -456,7 +458,7 @@ export class CollectionService {
 		} catch (err) {
 			// handle error
 			const customError = new CustomError('Het ophalen van de collecties is mislukt.', err, {
-				query: 'GET_COLLECTIONS',
+				query: 'GET_PUBLIC_COLLECTIONS',
 				variables: { limit },
 			});
 
@@ -487,7 +489,9 @@ export class CollectionService {
 				(await performQuery(
 					{
 						variables,
-						query: isUuidFormat ? GET_COLLECTIONS_BY_ID : GET_COLLECTIONS_BY_TITLE,
+						query: isUuidFormat
+							? GET_PUBLIC_COLLECTIONS_BY_ID
+							: GET_PUBLIC_COLLECTIONS_BY_TITLE,
 					},
 					'data.app_collections',
 					'Failed to retrieve items by title or external id.'
@@ -495,7 +499,7 @@ export class CollectionService {
 			);
 		} catch (err) {
 			throw new CustomError('Failed to fetch collections or bundles', err, {
-				query: 'GET_COLLECTIONS_BY_TITLE_OR_ID',
+				query: 'GET_PUBLIC_COLLECTIONS_BY_ID or GET_PUBLIC_COLLECTIONS_BY_TITLE',
 				variables: { titleOrId, isCollection, limit },
 			});
 		}
@@ -610,33 +614,8 @@ export class CollectionService {
 		type: 'collection' | 'bundle'
 	): Promise<Avo.Collection.Collection | undefined> {
 		try {
-			const response = await dataService.query({
-				query: GET_COLLECTION_BY_ID,
-				variables: { id: collectionId },
-			});
+			const collectionObj = await CollectionService.getCollectionById(collectionId);
 
-			if (response.errors) {
-				throw new CustomError(
-					`Failed to retrieve ${type} from database because of graphql errors`,
-					null,
-					{
-						collectionId,
-						errors: response.errors,
-					}
-				);
-			}
-
-			const collectionObj: Avo.Collection.Collection | null = get(
-				response,
-				'data.app_collections[0]'
-			);
-
-			if (!collectionObj) {
-				throw new CustomError(`query for ${type} returned empty result`, null, {
-					collectionId,
-					response,
-				});
-			}
 			// Collection/bundle loaded successfully
 			// If we find a bundle but the function type param asked for a collection, we return undefined (and vice versa)
 			if (collectionObj.type_id !== ContentTypeNumber[type]) {
@@ -648,7 +627,6 @@ export class CollectionService {
 			throw new CustomError('Failed to fetch collection or bundle by id', err, {
 				collectionId,
 				type,
-				query: 'GET_COLLECTION_BY_ID',
 			});
 		}
 	}
@@ -658,18 +636,22 @@ export class CollectionService {
 	 *
 	 * @param collectionId Unique id of the collection that must be fetched.
 	 * @param type Type of which items should be fetched.
+	 * @param assignmentId Collection can be fetched if it's not public and you're not the owner,
+	 *        but if it is linked to an assignment that you're trying to view
 	 *
 	 * @returns Collection or bundle.
 	 */
 	public static async fetchCollectionOrBundleWithItemsById(
 		collectionId: string,
-		type: 'collection' | 'bundle'
+		type: 'collection' | 'bundle',
+		assignmentId: number | undefined
 	): Promise<Avo.Collection.Collection | null> {
 		try {
 			const response = await fetchWithLogout(
 				`${getEnv('PROXY_URL')}/collections/fetch-with-items-by-id?${queryString.stringify({
-					id: collectionId,
 					type,
+					assignmentId,
+					id: collectionId,
 				})}`,
 				{
 					method: 'GET',
@@ -684,10 +666,10 @@ export class CollectionService {
 			}
 			if (response.status < 200 || response.status >= 400) {
 				throw new CustomError('invalid status code', null, {
-					statusCode: response.status,
 					collectionId,
 					type,
 					response,
+					statusCode: response.status,
 				});
 			}
 			return await response.json();
@@ -726,9 +708,9 @@ export class CollectionService {
 		fragments: Partial<Avo.Collection.Fragment>[]
 	): Promise<Avo.Collection.Fragment[]> {
 		try {
-			fragments.forEach(fragment => (fragment.collection_uuid = collectionId));
+			fragments.forEach((fragment) => (fragment.collection_uuid = collectionId));
 
-			const cleanedFragments = cloneDeep(fragments).map(fragment => {
+			const cleanedFragments = cloneDeep(fragments).map((fragment) => {
 				delete fragment.id;
 				delete (fragment as any).__typename;
 				delete fragment.item_meta;
@@ -831,7 +813,7 @@ export class CollectionService {
 			'collection',
 			user
 		);
-		const titles = collections.map(c => c.title);
+		const titles = collections.map((c) => c.title);
 
 		let index = 0;
 		let candidateTitle: string;
@@ -852,7 +834,7 @@ export class CollectionService {
 		let variables: any;
 		try {
 			variables = {
-				objects: labels.map(label => ({
+				objects: labels.map((label) => ({
 					label,
 					collection_uuid: collectionId,
 				})),
@@ -904,11 +886,11 @@ export class CollectionService {
 			if (!CollectionService.collectionLabels) {
 				// Fetch collection labels and cache them in memory
 
-				const labels: QualityLabel[] = (await this.fetchQualityLabels()) || [];
+				const labels: QualityLabel[] = (await CollectionService.fetchQualityLabels()) || [];
 
 				// Map result array to dictionary
 				CollectionService.collectionLabels = fromPairs(
-					labels.map(collectionLabel => [
+					labels.map((collectionLabel) => [
 						collectionLabel.value,
 						collectionLabel.description,
 					])
@@ -926,12 +908,13 @@ export class CollectionService {
 	static async getCollectionByTitleOrDescription(
 		title: string,
 		description: string | null,
-		collectionId: string
+		collectionId: string,
+		typeId: ContentTypeNumber
 	): Promise<{ byTitle: boolean; byDescription: boolean }> {
 		try {
 			const response = await dataService.query({
 				query: GET_COLLECTION_BY_TITLE_OR_DESCRIPTION,
-				variables: { title, description, collectionId },
+				variables: { title, description, collectionId, typeId },
 			});
 
 			if (response.errors) {

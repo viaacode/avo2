@@ -10,7 +10,7 @@ describe('helpers > redux > createReducer', () => {
 	it('Should correctly create a callable reducer', () => {
 		const reducer = createReducer<Number[]>([], {
 			add: (state, action: AddAction) => [...state, action.value],
-			subtract: state => state.slice(0, -1),
+			subtract: (state) => state.slice(0, -1),
 			clear: () => [],
 		});
 

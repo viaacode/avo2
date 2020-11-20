@@ -36,7 +36,7 @@ const AssignmentLabels: FunctionComponent<AssignmentLabelsProps> = ({ labels, us
 	}, [fetchAssignmentLabels]);
 
 	const getAssignmentLabelOptions = (labels: Avo.Assignment.Label[]): TagOption[] => {
-		return labels.map(labelObj => ({
+		return labels.map((labelObj) => ({
 			label: labelObj.label || '',
 			id: labelObj.id,
 			// labelObj.enum_color.label contains hex code (graphql enum quirk)
@@ -51,7 +51,7 @@ const AssignmentLabels: FunctionComponent<AssignmentLabelsProps> = ({ labels, us
 	};
 
 	const getColorOptions = (labels: Avo.Assignment.Label[]): ColorOption[] => {
-		return labels.map(labelObj => ({
+		return labels.map((labelObj) => ({
 			label: labelObj.label || '',
 			value: String(labelObj.id),
 			// labelObj.enum_color.label contains hex code (graphql enum quirk)
@@ -70,7 +70,7 @@ const AssignmentLabels: FunctionComponent<AssignmentLabelsProps> = ({ labels, us
 			return;
 		}
 		const assignmentLabel = allAssignmentLabels.find(
-			labelObj => String(labelObj.id) === (labelOption as ColorOption).value
+			(labelObj) => String(labelObj.id) === (labelOption as ColorOption).value
 		);
 		if (!assignmentLabel) {
 			ToastService.danger(
@@ -88,9 +88,9 @@ const AssignmentLabels: FunctionComponent<AssignmentLabelsProps> = ({ labels, us
 		onChange(labels.filter((labelObj: Avo.Assignment.Label) => labelObj.id !== labelId));
 	};
 
-	const assignmentLabelIds = labels.map(labelObj => labelObj.id);
+	const assignmentLabelIds = labels.map((labelObj) => labelObj.id);
 	const unselectedLabels = cloneDeep(
-		allAssignmentLabels.filter(labelObj => !assignmentLabelIds.includes(labelObj.id))
+		allAssignmentLabels.filter((labelObj) => !assignmentLabelIds.includes(labelObj.id))
 	);
 
 	return (

@@ -55,8 +55,8 @@ const MenuEditForm: FunctionComponent<MenuEditFormProps> = ({
 			>
 				{/* TODO: Add CreatableSelect to components lib */}
 				<CreatableSelect
-					value={menuParentOptions.find(opt => opt.value === menuParentId)}
-					formatCreateLabel={inputValue => `Aanmaken: ${inputValue}`}
+					value={menuParentOptions.find((opt) => opt.value === menuParentId)}
+					formatCreateLabel={(inputValue) => `Aanmaken: ${inputValue}`}
 					getNewOptionData={handleMenuCreate}
 					onChange={(option: ValueType<ReactSelectOption<string>>) =>
 						onChange('placement', get(option, 'value', ''))

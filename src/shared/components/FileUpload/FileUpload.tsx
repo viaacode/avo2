@@ -1,4 +1,4 @@
-import { isString } from 'lodash-es';
+import { compact, isString } from 'lodash-es';
 import queryString from 'query-string';
 import React, { FunctionComponent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +31,7 @@ export interface FileUploadProps {
 	assetType: Avo.FileUpload.AssetType;
 	ownerId: string;
 	urls: string[] | null;
+	showDeleteButton?: boolean;
 	disabled?: boolean;
 	onChange: (urls: string[]) => void;
 }
@@ -43,6 +44,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 	assetType,
 	ownerId,
 	urls,
+	showDeleteButton = true,
 	disabled = false,
 	onChange,
 }) => {
@@ -54,18 +56,12 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 			if (files && files.length) {
 				// If allowedTypes array is empty, all filetypes are allowed
 				const notAllowedFiles = allowedTypes.length
-					? files.filter(file => !allowedTypes.includes(file.type))
+					? files.filter((file) => !allowedTypes.includes(file.type))
 					: [];
 				if (notAllowedFiles.length) {
-					const allowedExtensions = allowedTypes
-						.map((type: string) => type.split('/').pop() || type)
-						.join(', ');
 					ToastService.danger(
 						t(
-							'shared/components/file-upload/file-upload___een-geselecteerde-bestand-is-niet-toegelaten-allowed-extensions',
-							{
-								allowedExtensions,
-							}
+							'shared/components/file-upload/file-upload___een-geselecteerde-bestand-is-niet-toegelaten'
 						)
 					);
 					return;
@@ -112,7 +108,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 			setIsProcessing(true);
 			if (urls) {
 				const newUrls = [...urls];
-				for (let i = 0; i < newUrls.length; i += 1) {
+				for (let i = newUrls.length - 1; i >= 0; i -= 1) {
 					if (newUrls[i] === url) {
 						await FileUploadService.deleteFile(url);
 						newUrls.splice(i, 1);
@@ -134,7 +130,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 	};
 
 	const renderDeleteButton = (url: string) => {
-		if (disabled) {
+		if (disabled || !showDeleteButton) {
 			return null;
 		}
 		return (
@@ -156,7 +152,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 			return null;
 		}
 
-		return urls.map(url => {
+		return compact(urls).map((url) => {
 			if (isPhoto(url)) {
 				return (
 					<Spacer margin="bottom-small" key={url}>
@@ -186,7 +182,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 					fileName = queryParams.name as string;
 				}
 			}
-			if (!fileName) {
+			if (!fileName && url) {
 				const urlInfo = getUrlInfo(url.split('?')[0]);
 				fileName = `${urlInfo.fileName.substring(
 					0,
@@ -196,7 +192,11 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 
 			return (
 				<Spacer margin="bottom-small" key={url}>
-					<Blankslate title={fileName} icon="file" className="a-upload-file-preview">
+					<Blankslate
+						title={fileName || ''}
+						icon="file"
+						className="a-upload-file-preview"
+					>
 						{renderDeleteButton(url)}
 					</Blankslate>
 				</Spacer>
@@ -238,7 +238,7 @@ const FileUpload: FunctionComponent<FileUploadProps> = ({
 									'shared/components/file-upload/file-upload___kies-een-bestand'
 								)}
 								multiple={allowMulti}
-								onChange={evt =>
+								onChange={(evt) =>
 									!!evt.target.files &&
 									uploadSelectedFile(Array.from(evt.target.files))
 								}

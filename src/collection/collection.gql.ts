@@ -35,11 +35,18 @@ export const GET_COLLECTION_BY_ID = gql`
 			owner_profile_id
 			profile {
 				alias
+				title
 				alternative_email
 				avatar
 				id
 				stamboek
 				updated_at
+				profile_user_groups {
+					groups {
+						label
+						id
+					}
+				}
 				user_id
 				user: usersByuserId {
 					id
@@ -51,11 +58,6 @@ export const GET_COLLECTION_BY_ID = gql`
 					mail
 					uid
 					updated_at
-					role {
-						id
-						name
-						label
-					}
 				}
 				created_at
 				updated_at
@@ -81,9 +83,13 @@ export const GET_COLLECTION_BY_ID = gql`
 					id
 					first_name
 					last_name
-					role {
-						id
-						label
+					profile {
+						profile_user_groups {
+							groups {
+								label
+								id
+							}
+						}
 					}
 				}
 			}
@@ -188,9 +194,11 @@ export const GET_COLLECTIONS_BY_OWNER = gql`
 			}
 			title
 			publish_at
+			owner_profile_id
 			profile {
 				id
 				alias
+				title
 				alternative_email
 				avatar
 				organisation {
@@ -206,9 +214,13 @@ export const GET_COLLECTIONS_BY_OWNER = gql`
 					id
 					first_name
 					last_name
-					role {
-						id
-						label
+					profile {
+						profile_user_groups {
+							groups {
+								label
+								id
+							}
+						}
 					}
 				}
 			}
@@ -228,11 +240,11 @@ export const GET_COLLECTIONS_BY_OWNER = gql`
 	}
 `;
 
-export const GET_COLLECTIONS = gql`
+export const GET_PUBLIC_COLLECTIONS = gql`
 	query getCollections($limit: Int!, $typeId: Int!) {
 		app_collections(
 			order_by: { title: asc }
-			where: { type_id: { _eq: $typeId } }
+			where: { type_id: { _eq: $typeId }, is_public: { _eq: true } }
 			limit: $limit
 		) {
 			id
@@ -241,11 +253,11 @@ export const GET_COLLECTIONS = gql`
 	}
 `;
 
-export const GET_COLLECTIONS_BY_ID = gql`
+export const GET_PUBLIC_COLLECTIONS_BY_ID = gql`
 	query getCollections($id: uuid!, $typeId: Int!, $limit: Int!) {
 		app_collections(
 			order_by: { title: asc }
-			where: { type_id: { _eq: $typeId }, id: { _eq: $id } }
+			where: { type_id: { _eq: $typeId }, id: { _eq: $id }, is_public: { _eq: true } }
 			limit: $limit
 		) {
 			id
@@ -254,11 +266,15 @@ export const GET_COLLECTIONS_BY_ID = gql`
 	}
 `;
 
-export const GET_COLLECTIONS_BY_TITLE = gql`
+export const GET_PUBLIC_COLLECTIONS_BY_TITLE = gql`
 	query getCollections($title: String!, $typeId: Int!, $limit: Int!) {
 		app_collections(
 			order_by: { title: asc }
-			where: { type_id: { _eq: $typeId }, title: { _ilike: $title } }
+			where: {
+				type_id: { _eq: $typeId }
+				title: { _ilike: $title }
+				is_public: { _eq: true }
+			}
 			limit: $limit
 		) {
 			id
@@ -334,6 +350,7 @@ export const GET_COLLECTION_BY_TITLE_OR_DESCRIPTION = gql`
 		$title: String!
 		$description: String!
 		$collectionId: uuid!
+		$typeId: Int
 	) {
 		collectionByTitle: app_collections(
 			where: {
@@ -341,6 +358,7 @@ export const GET_COLLECTION_BY_TITLE_OR_DESCRIPTION = gql`
 				is_deleted: { _eq: false }
 				is_public: { _eq: true }
 				id: { _neq: $collectionId }
+				type_id: { _eq: $typeId }
 			}
 			limit: 1
 		) {
@@ -352,6 +370,7 @@ export const GET_COLLECTION_BY_TITLE_OR_DESCRIPTION = gql`
 				is_deleted: { _eq: false }
 				is_public: { _eq: true }
 				id: { _neq: $collectionId }
+				type_id: { _eq: $typeId }
 			}
 			limit: 1
 		) {
@@ -365,6 +384,7 @@ export const GET_COLLECTIONS_BY_FRAGMENT_ID = gql`
 		app_collections(where: { collection_fragments: { external_id: { _eq: $fragmentId } } }) {
 			id
 			title
+			is_public
 			profile {
 				user: usersByuserId {
 					first_name
@@ -372,9 +392,8 @@ export const GET_COLLECTIONS_BY_FRAGMENT_ID = gql`
 					id
 				}
 				id
-				profile_organizations {
-					organization_id
-					unit_id
+				organisation {
+					name
 				}
 			}
 		}

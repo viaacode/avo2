@@ -1,3 +1,4 @@
+import { get } from 'lodash-es';
 import React, { FunctionComponent, ReactElement, ReactText, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
@@ -10,23 +11,28 @@ import {
 	ToolbarLeft,
 	ToolbarRight,
 } from '@viaa/avo2-components';
+import { Avo } from '@viaa/avo2-types';
 
+import { SpecialUserGroup } from '../../admin/user-groups/user-group.const';
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import { redirectToClientPage } from '../../authentication/helpers/redirects';
 import { APP_PATH } from '../../constants';
 import { InteractiveTour } from '../../shared/components';
 import { buildLink } from '../../shared/helpers';
+import withUser, { UserProps } from '../../shared/hocs/withUser';
 import { ToastService } from '../../shared/services';
 import { Account, Email, Notifications, Profile } from '../components';
 import { ACCOUNT_ID, EMAIL_ID, NOTIFICATIONS_ID, PROFILE_ID, SettingsTab } from '../settings.const';
 
 interface ForPupilsProps extends DefaultSecureRouteProps<{ tabId: string }> {}
 
-const Settings: FunctionComponent<ForPupilsProps> = props => {
+const Settings: FunctionComponent<ForPupilsProps & UserProps> = (props) => {
 	const [t] = useTranslation();
 
 	const [activeTab, setActiveTab] = useState<SettingsTab>(props.match.params.tabId || PROFILE_ID);
+
+	const isPupil = get(props.user, 'profile.userGroupIds[0]') === SpecialUserGroup.Pupil;
 
 	const generateTabHeader = (id: string, label: string) => ({
 		id,
@@ -35,16 +41,30 @@ const Settings: FunctionComponent<ForPupilsProps> = props => {
 		onClick: () => setActiveTab(id),
 	});
 
-	const getTabHeaders = () => [
-		generateTabHeader(PROFILE_ID, t('settings/views/settings___profiel')),
-		generateTabHeader(ACCOUNT_ID, t('settings/views/settings___account')),
-		...(PermissionService.hasPerm(props.user, PermissionName.VIEW_NEWSLETTERS_PAGE)
-			? [generateTabHeader(EMAIL_ID, t('settings/views/settings___e-mail-voorkeuren'))]
-			: []),
-		...(PermissionService.hasPerm(props.user, PermissionName.VIEW_NOTIFICATIONS_PAGE)
-			? [generateTabHeader(NOTIFICATIONS_ID, t('settings/views/settings___notifications'))]
-			: []),
-	];
+	const getTabHeaders = () => {
+		const tabHeaders = [generateTabHeader(PROFILE_ID, t('settings/views/settings___profiel'))];
+
+		// Only pupils with an archief account can view the account tab
+		if (
+			!isPupil ||
+			get(props, 'user.idpmaps', []).find(
+				(idpMap: Avo.Auth.IdpType) => idpMap === 'HETARCHIEF'
+			)
+		) {
+			tabHeaders.push(generateTabHeader(ACCOUNT_ID, t('settings/views/settings___account')));
+		}
+
+		if (PermissionService.hasPerm(props.user, PermissionName.VIEW_NEWSLETTERS_PAGE)) {
+			tabHeaders.push(
+				generateTabHeader(EMAIL_ID, t('settings/views/settings___e-mail-voorkeuren'))
+			);
+		}
+		if (PermissionService.hasPerm(props.user, PermissionName.VIEW_NOTIFICATIONS_PAGE)) {
+			generateTabHeader(NOTIFICATIONS_ID, t('settings/views/settings___notifications'));
+		}
+
+		return tabHeaders;
+	};
 
 	const tabContents = {
 		[PROFILE_ID]: {
@@ -115,4 +135,4 @@ const Settings: FunctionComponent<ForPupilsProps> = props => {
 	);
 };
 
-export default Settings;
+export default withUser(Settings) as FunctionComponent<ForPupilsProps>;

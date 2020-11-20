@@ -160,7 +160,7 @@ export const FILE_FIELD = (
 	...propOverride,
 });
 
-export const VIDEO_FIELD = (
+export const ITEM_PICKER_FIELD = (
 	emptyFieldValidatorMessage = i18n.t(
 		'admin/content-block/helpers/generators/defaults___selecteren-van-video-item-is-verplicht'
 	),

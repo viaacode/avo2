@@ -20,10 +20,33 @@
 			padding-top: 0;
 		}
 	}
+
+	.c-meta-data__table-mobile {
+		margin-top: 15px;
+		th, td {
+			display: inline-block;
+		}
+
+		td {
+			width: calc(100% - 130px);
+		}
+
+		th {
+			width: 130px;
+		}
+	}
 }
 
 .c-item-detail__header {
 	.c-meta-data__item p {
 		margin: 0.36rem 0;
+	}
+
+	&.c-item-detail__header-mobile {
+		.o-flex .c-meta-data {
+			display: flex;
+			align-items: flex-start;
+			flex-direction: column;
+		}
 	}
 }

@@ -5,11 +5,10 @@ import { BlockIntro } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
-import { redirectToClientPage } from '../../../authentication/helpers/redirects';
 import { APP_PATH } from '../../../constants';
 import { ItemVideoDescription } from '../../../item/components';
 import { DEFAULT_AUDIO_STILL } from '../../../shared/constants';
-import { buildLink } from '../../../shared/helpers';
+import { buildLink, isMobileWidth } from '../../../shared/helpers';
 import { getFragmentProperty } from '../../helpers';
 
 import './FragmentDetail.scss';
@@ -32,13 +31,12 @@ const FragmentDetail: FunctionComponent<FragmentDetailProps> = ({
 	collectionFragment,
 	showDescription,
 	linkToItems,
-	history,
 }) => {
 	if (get(collectionFragment, 'item_meta.type.label') === 'audio') {
 		collectionFragment.thumbnail_path = DEFAULT_AUDIO_STILL;
 	}
 
-	const getTitleClickedHandler = () => {
+	const getTitleLink = (): string | undefined => {
 		if (
 			linkToItems &&
 			collectionFragment.item_meta &&
@@ -46,17 +44,11 @@ const FragmentDetail: FunctionComponent<FragmentDetailProps> = ({
 			(collectionFragment.item_meta.type.label === 'video' ||
 				collectionFragment.item_meta.type.label === 'audio')
 		) {
-			return () => {
-				if (collectionFragment.item_meta) {
-					redirectToClientPage(
-						buildLink(APP_PATH.ITEM_DETAIL.route, {
-							id: (collectionFragment.item_meta as Avo.Item.Item).external_id,
-						}),
-						history
-					);
-				}
-			};
+			return buildLink(APP_PATH.ITEM_DETAIL.route, {
+				id: (collectionFragment.item_meta as Avo.Item.Item).external_id,
+			});
 		}
+		return undefined;
 	};
 
 	return collectionFragment.item_meta ? (
@@ -82,11 +74,12 @@ const FragmentDetail: FunctionComponent<FragmentDetailProps> = ({
 				collectionFragment.use_custom_fields,
 				'description'
 			)}
-			onTitleClicked={getTitleClickedHandler()}
+			titleLink={getTitleLink()}
 			cuePoints={{
 				start: collectionFragment.start_oc,
 				end: collectionFragment.end_oc,
 			}}
+			verticalLayout={isMobileWidth()}
 		/>
 	) : (
 		<BlockIntro

@@ -1,6 +1,6 @@
 import { compact, get } from 'lodash';
 import moment from 'moment';
-import React, { FunctionComponent, useEffect, useState } from 'react';
+import React, { FunctionComponent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import {
@@ -14,16 +14,15 @@ import {
 	Thumbnail,
 } from '@viaa/avo2-components';
 
+import { getUserGroupLabel } from '../../../authentication/helpers/get-profile-info';
 import Html from '../../../shared/components/Html/Html';
-import { formatDate } from '../../../shared/helpers';
-import { ToastService } from '../../../shared/services';
-import { fetchAllUserGroups } from '../../../shared/services/user-groups-service';
+import { formatDate, getFullName } from '../../../shared/helpers';
 import {
 	renderDateDetailRows,
 	renderDetailRow,
 	renderSimpleDetailRows,
 } from '../../shared/helpers/render-detail-fields';
-import { UserService } from '../../users/user.service';
+import { useUserGroupOptions } from '../../user-groups/hooks/useUserGroupOptions';
 import { GET_CONTENT_WIDTH_OPTIONS } from '../content.const';
 import { ContentService } from '../content.service';
 import { ContentPageInfo } from '../content.types';
@@ -39,25 +38,7 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 	const [t] = useTranslation();
 
 	const [contentTypes] = useContentTypes();
-
-	const [allUserGroups, setAllUserGroups] = useState<TagInfo[]>([]);
-
-	// Get labels of the contentPages, so we can show a readable error message
-	useEffect(() => {
-		fetchAllUserGroups()
-			.then(userGroups => {
-				setAllUserGroups(userGroups);
-			})
-			.catch((err: any) => {
-				console.error('Failed to get user groups', err);
-				ToastService.danger(
-					t(
-						'admin/shared/components/user-group-select/user-group-select___het-controleren-van-je-account-rechten-is-mislukt'
-					),
-					false
-				);
-			});
-	}, [setAllUserGroups, t]);
+	const [allUserGroupOptions] = useUserGroupOptions('TagInfo', true) as [TagInfo[], boolean];
 
 	// Methods
 	const getUserGroups = (contentPageInfo: ContentPageInfo): TagOption[] => {
@@ -65,8 +46,8 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 			(contentPageInfo.user_group_ids || []).map((userGroupId: number):
 				| TagInfo
 				| undefined => {
-				return allUserGroups.find(
-					(userGroupOption: any) => userGroupOption.value === userGroupId
+				return allUserGroupOptions.find(
+					(userGroup: TagInfo) => userGroup.value === userGroupId
 				);
 			})
 		);
@@ -93,7 +74,7 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 	const getContentPageWidthLabel = (contentPageInfo: ContentPageInfo): string => {
 		return get(
 			GET_CONTENT_WIDTH_OPTIONS().find(
-				option => option.value === contentPageInfo.content_width
+				(option) => option.value === contentPageInfo.content_width
 			),
 			'label',
 			'-'
@@ -165,6 +146,12 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 									'admin/content/views/content-detail-meta-data___seo-beschrijving'
 								),
 							],
+							[
+								'meta_description',
+								t(
+									'admin/content/views/content-detail-meta-data___beschrijving-voor-export-bv-klaar-nieuwsbrief'
+								),
+							],
 							['path', t('admin/content/views/content-detail___pad')],
 							[
 								'is_protected',
@@ -174,7 +161,7 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 						{renderDetailRow(
 							get(
 								contentTypes.find(
-									type => type.value === contentPageInfo.content_type
+									(type) => type.value === contentPageInfo.content_type
 								),
 								'label'
 							) || '-',
@@ -185,14 +172,13 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 							t('admin/content/views/content-detail___breedte')
 						)}
 						{renderDetailRow(
-							`${get(contentPageInfo, 'profile.user.first_name')} ${get(
-								contentPageInfo,
-								'profile.user.last_name'
-							)}`,
+							!!get(contentPageInfo, 'profile.user')
+								? getFullName(get(contentPageInfo, 'profile'), false, false)
+								: '-',
 							t('admin/content/views/content-detail___auteur')
 						)}
 						{renderDetailRow(
-							UserService.getUserRoleLabel(get(contentPageInfo, 'profile')),
+							getUserGroupLabel(contentPageInfo) || '-',
 							t('admin/content/views/content-detail___auteur-rol')
 						)}
 						{renderDateDetailRows(contentPageInfo, [
@@ -239,8 +225,8 @@ export const ContentDetailMetaData: FunctionComponent<ContentDetailMetaDataProps
 								selectable={false}
 								closable={false}
 								tags={contentPageInfo.labels
-									.filter(labelObj => labelObj.label && labelObj.id)
-									.map(labelObj => ({
+									.filter((labelObj) => labelObj.label && labelObj.id)
+									.map((labelObj) => ({
 										label: labelObj.label as string,
 										id: String(labelObj.id),
 									}))}

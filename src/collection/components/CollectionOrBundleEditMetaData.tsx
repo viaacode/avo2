@@ -1,3 +1,4 @@
+import { StringMap } from 'i18next';
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,12 +9,12 @@ import {
 	Form,
 	FormGroup,
 	Grid,
-	RichEditorState,
 	Spacer,
 	TagInfo,
 	TagsInput,
 	TextArea,
 } from '@viaa/avo2-components';
+import { RichEditorState } from '@viaa/avo2-components/dist/esm/wysiwyg';
 import { Avo } from '@viaa/avo2-types';
 
 import { SettingsService } from '../../settings/settings.service';
@@ -23,9 +24,11 @@ import {
 	WYSIWYG_OPTIONS_BUNDLE_DESCRIPTION,
 	WYSIWYG_OPTIONS_DEFAULT_NO_TITLES,
 } from '../../shared/constants/wysiwyg';
-import { CustomError, sanitizeHtml } from '../../shared/helpers';
+import { CustomError, sanitizeHtml, stripHtml } from '../../shared/helpers';
+import { stringToSelectOption } from '../../shared/helpers/string-to-select-options';
+import i18n from '../../shared/translations/i18n';
 import { MAX_LONG_DESCRIPTION_LENGTH, MAX_SEARCH_DESCRIPTION_LENGTH } from '../collection.const';
-import { getValidationFeedbackForShortDescription } from '../collection.helpers';
+import { getValidationFeedbackForDescription } from '../collection.helpers';
 import { CollectionStillsModal } from '../components';
 
 import { CollectionAction } from './CollectionOrBundleEdit';
@@ -56,20 +59,10 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 	useEffect(() => {
 		Promise.all([SettingsService.fetchSubjects(), SettingsService.fetchEducationLevels()])
 			.then((response: [string[], string[]]) => {
-				setSubjects(
-					response[0].map(subject => ({
-						value: subject,
-						label: subject,
-					}))
-				);
-				setEducationLevels(
-					response[1].map(educationLevel => ({
-						value: educationLevel,
-						label: educationLevel,
-					}))
-				);
+				setSubjects(response[0].map(stringToSelectOption));
+				setEducationLevels(response[1].map(stringToSelectOption));
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error(
 					new CustomError(
 						'Failed to get education levels and subjects from the database',
@@ -86,7 +79,7 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 		changeCollectionState({
 			collectionProp,
 			type: 'UPDATE_COLLECTION_PROP',
-			collectionPropValue: (selectedTagOptions || []).map(tag => tag.value as string),
+			collectionPropValue: (selectedTagOptions || []).map((tag) => tag.value as string),
 		});
 	};
 
@@ -107,10 +100,7 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 										<TagsInput
 											options={educationLevels}
 											value={(collection.lom_context || []).map(
-												(item: string) => ({
-													value: item,
-													label: item,
-												})
+												stringToSelectOption
 											)}
 											onChange={(values: TagInfo[]) =>
 												updateCollectionMultiProperty(values, 'lom_context')
@@ -126,10 +116,7 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 										<TagsInput
 											options={subjects}
 											value={(collection.lom_classification || []).map(
-												(item: string) => ({
-													value: item,
-													label: item,
-												})
+												stringToSelectOption
 											)}
 											onChange={(values: TagInfo[]) =>
 												updateCollectionMultiProperty(
@@ -144,9 +131,14 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 											'collection/views/collection-edit-meta-data___korte-omschrijving'
 										)}
 										labelFor="shortDescriptionId"
-										error={getValidationFeedbackForShortDescription(
+										error={getValidationFeedbackForDescription(
 											collection.description,
 											MAX_SEARCH_DESCRIPTION_LENGTH,
+											(count) =>
+												i18n.t(
+													'collection/collection___de-korte-omschrijving-is-te-lang-count',
+													{ count } as StringMap
+												),
 											true
 										)}
 									>
@@ -155,6 +147,9 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 											value={collection.description || ''}
 											id="shortDescriptionId"
 											height="medium"
+											placeholder={t(
+												'collection/components/collection-or-bundle-edit-meta-data___omschrijf-je-collectie-in-enkele-kernzinnen-dit-is-de-tekst-die-andere-gebruikers-naast-jouw-collectie-of-bundel-te-zien-krijgen-in-de-zoekresultaten'
+											)}
 											onChange={(value: string) =>
 												changeCollectionState({
 													type: 'UPDATE_COLLECTION_PROP',
@@ -164,9 +159,14 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 											}
 										/>
 										<label>
-											{getValidationFeedbackForShortDescription(
+											{getValidationFeedbackForDescription(
 												collection.description,
-												MAX_SEARCH_DESCRIPTION_LENGTH
+												MAX_SEARCH_DESCRIPTION_LENGTH,
+												(count) =>
+													t(
+														'collection/collection___de-korte-omschrijving-is-te-lang-count',
+														{ count } as StringMap
+													)
 											)}
 										</label>
 									</FormGroup>
@@ -176,9 +176,21 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 												'collection/components/collection-or-bundle-edit-meta-data___beschrijving'
 											)}
 											labelFor="longDescriptionId"
-											error={getValidationFeedbackForShortDescription(
-												collection.description_long,
+											error={getValidationFeedbackForDescription(
+												stripHtml(
+													descriptionLongEditorState
+														? descriptionLongEditorState.toHTML()
+														: collection.description_long || ''
+												),
 												MAX_LONG_DESCRIPTION_LENGTH,
+												(count) => {
+													return t(
+														'collection/components/collection-or-bundle-edit-meta-data___de-beschrijving-is-te-lang-count',
+														{
+															count,
+														} as StringMap
+													);
+												},
 												true
 											)}
 										>
@@ -206,9 +218,20 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 												}
 											/>
 											<label>
-												{getValidationFeedbackForShortDescription(
-													collection.description_long,
-													MAX_LONG_DESCRIPTION_LENGTH
+												{getValidationFeedbackForDescription(
+													stripHtml(
+														descriptionLongEditorState
+															? descriptionLongEditorState.toHTML()
+															: collection.description_long || ''
+													),
+													MAX_LONG_DESCRIPTION_LENGTH,
+													(count) =>
+														t(
+															'collection/components/collection-or-bundle-edit-meta-data___de-beschrijving-is-te-lang-count',
+															{
+																count,
+															} as StringMap
+														)
 												)}
 											</label>
 										</FormGroup>
@@ -274,7 +297,7 @@ const CollectionOrBundleEditMetaData: FunctionComponent<CollectionOrBundleEditMe
 												allowMulti={false}
 												assetType="BUNDLE_COVER"
 												ownerId={collection.id}
-												onChange={urls =>
+												onChange={(urls) =>
 													changeCollectionState({
 														type: 'UPDATE_COLLECTION_PROP',
 														collectionProp: 'thumbnail_path',

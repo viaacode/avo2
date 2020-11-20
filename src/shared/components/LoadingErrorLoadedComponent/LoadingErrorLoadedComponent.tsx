@@ -92,6 +92,7 @@ export async function checkPermissions(
 		if (!user) {
 			return;
 		}
+
 		if (await PermissionService.hasPermissions(permissions, user)) {
 			successFunc();
 		} else {

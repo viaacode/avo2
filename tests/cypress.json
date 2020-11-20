@@ -1,9 +1,0 @@
-{
-	"reporter": "junit",
-	"reporterOptions": {
-		"mochaFile": "ci-results/cypress-report-[hash].xml",
-		"toConsole": true
-	},
-	"chromeWebSecurity": false,
-	"testFiles": "**/*.spec.ts"
-}

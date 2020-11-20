@@ -1,16 +1,5 @@
-import {
-	cloneDeep,
-	every,
-	get,
-	isArray,
-	isEmpty,
-	isEqual,
-	isNil,
-	isPlainObject,
-	pickBy,
-	set,
-} from 'lodash-es';
-import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
+import { cloneDeep, every, get, isArray, isEmpty, isEqual, isNil, isPlainObject, pickBy, set, } from 'lodash-es';
+import React, { FunctionComponent, ReactText, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 import { connect } from 'react-redux';
@@ -20,9 +9,6 @@ import { JsonParam, StringParam, UrlUpdateType, useQueryParams } from 'use-query
 import {
 	Button,
 	Container,
-	Dropdown,
-	DropdownButton,
-	DropdownContent,
 	Flex,
 	Form,
 	FormGroup,
@@ -38,18 +24,15 @@ import {
 	useKeyPress,
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
-import { SearchResultItem } from '@viaa/avo2-types/types/search/index';
+import { SearchResultItem } from '@viaa/avo2-types/types/search';
 
-import {
-	PermissionGuard,
-	PermissionGuardFail,
-	PermissionGuardPass,
-} from '../../authentication/components';
-import { PermissionName } from '../../authentication/helpers/permission-service';
+import { PermissionGuard, PermissionGuardFail, PermissionGuardPass, } from '../../authentication/components';
+import { PermissionName } from '../../authentication/helpers/permission-names';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
 import { ErrorView } from '../../error/views';
 import { InteractiveTour } from '../../shared/components';
-import { copyToClipboard, CustomError, navigate } from '../../shared/helpers';
+import MoreOptionsDropdown from '../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
+import { copyToClipboard, CustomError, isMobileWidth, navigate } from '../../shared/helpers';
 import { BookmarksViewsPlaysService, ToastService } from '../../shared/services';
 import {
 	CONTENT_TYPE_TO_EVENT_CONTENT_TYPE,
@@ -62,16 +45,13 @@ import {
 import { AppState } from '../../store';
 import { SearchFilterControls, SearchResults } from '../components';
 import { DEFAULT_FILTER_STATE, DEFAULT_SORT_ORDER, ITEMS_PER_PAGE } from '../search.const';
-import {
-	FilterState,
-	SearchFilterFieldValues,
-	SearchFilterMultiOptions,
-	SearchProps,
-} from '../search.types';
+import { fetchSearchResults } from '../search.service';
+import { FilterState, SearchFilterFieldValues, SearchFilterMultiOptions, SearchProps, } from '../search.types';
 import { getSearchResults } from '../store/actions';
 import { selectSearchError, selectSearchLoading, selectSearchResults } from '../store/selectors';
 
 import './Search.scss';
+import { PermissionService } from '../../authentication/helpers/permission-service';
 
 const Search: FunctionComponent<SearchProps> = ({
 	searchResults,
@@ -131,9 +111,12 @@ const Search: FunctionComponent<SearchProps> = ({
 	}, [setSearchTerms, filterState]);
 
 	useEffect(() => {
+		if (!PermissionService.hasPerm(user, PermissionName.SEARCH)) {
+			return;
+		}
 		onFilterStateChanged();
 		updateSearchTerms();
-	}, [onFilterStateChanged, updateSearchTerms]);
+	}, [onFilterStateChanged, updateSearchTerms, user]);
 
 	/**
 	 * Update the filter values and scroll to the top
@@ -185,8 +168,10 @@ const Search: FunctionComponent<SearchProps> = ({
 	}, [t, setBookmarkStatuses, searchResults, user]);
 
 	useEffect(() => {
-		getBookmarkStatuses();
-	}, [getBookmarkStatuses]);
+		if (PermissionService.hasPerm(user, PermissionName.CREATE_BOOKMARKS)) {
+			getBookmarkStatuses();
+		}
+	}, [getBookmarkStatuses, user]);
 
 	const handleFilterFieldChange = async (
 		value: SearchFilterFieldValues,
@@ -242,7 +227,7 @@ const Search: FunctionComponent<SearchProps> = ({
 				const isEmptyObjectOrArray: boolean =
 					(isPlainObject(value) || isArray(value)) && isEmpty(value);
 				const isArrayWithEmptyValues: boolean =
-					isArray(value) && every(value, arrayValue => arrayValue === '');
+					isArray(value) && every(value, (arrayValue) => arrayValue === '');
 				const isEmptyRangeObject: boolean =
 					isPlainObject(value) && !(value as any).gte && !(value as any).lte;
 
@@ -258,15 +243,8 @@ const Search: FunctionComponent<SearchProps> = ({
 	};
 
 	const deleteAllFilters = () => {
-		setFilterState(
-			{
-				...filterState,
-				filters: {
-					...DEFAULT_FILTER_STATE,
-				},
-			},
-			urlUpdateType
-		);
+		setSearchTerms('');
+		setFilterState({}, urlUpdateType);
 	};
 
 	const setPage = async (pageIndex: number): Promise<void> => {
@@ -277,7 +255,7 @@ const Search: FunctionComponent<SearchProps> = ({
 		try {
 			const results = get(searchResults, 'results', []);
 			const resultItem: SearchResultItem | undefined = results.find(
-				result => result.uid === uuid
+				(result) => result.uid === uuid
 			);
 			if (!resultItem) {
 				throw new CustomError('Failed to find search result by id');
@@ -382,8 +360,9 @@ const Search: FunctionComponent<SearchProps> = ({
 		},
 		{ label: t('search/views/search___laatst-gewijzigd'), value: 'updatedAt_desc' },
 	];
-	const defaultOrder = `${filterState.orderProperty ||
-		'relevance'}_${filterState.orderDirection || 'desc'}`;
+	const defaultOrder = `${filterState.orderProperty || 'relevance'}_${
+		filterState.orderDirection || 'desc'
+	}`;
 	const hasFilters = !isEqual(filterState.filters, DEFAULT_FILTER_STATE);
 	const resultsCount = get(searchResults, 'count', 0);
 	// elasticsearch can only handle 10000 results efficiently
@@ -394,11 +373,51 @@ const Search: FunctionComponent<SearchProps> = ({
 	const navigateToUserRequestForm = () =>
 		navigate(history, APP_PATH.USER_ITEM_REQUEST_FORM.route);
 
+	const onSearchInSearchFilter = async (id: string) => {
+		const orderProperty: Avo.Search.OrderProperty =
+			(filterState.orderProperty as Avo.Search.OrderProperty | undefined) ||
+			DEFAULT_SORT_ORDER.orderProperty;
+
+		const orderDirection: Avo.Search.OrderDirection =
+			(filterState.orderDirection as Avo.Search.OrderDirection | undefined) ||
+			DEFAULT_SORT_ORDER.orderDirection;
+
+		const response = await fetchSearchResults(
+			orderProperty,
+			orderDirection,
+			0,
+			0, // We are only interested in aggs
+			cleanupFilterState(filterState).filters,
+			{},
+			[id as Avo.Search.FilterProp],
+			1000
+		);
+
+		setMultiOptions({
+			...multiOptions,
+			...response.aggregations,
+		});
+	};
+
+	const handleOptionClicked = (optionId: string | number | ReactText) => {
+		setIsOptionsMenuOpen(false);
+
+		switch (optionId) {
+			case 'copy_link':
+				onCopySearchLinkClicked();
+				return;
+
+			case 'save':
+				ToastService.info(t('search/views/search___nog-niet-geimplementeerd'));
+				return;
+		}
+	};
+
 	const renderSearchPage = () => (
-		<Container className="c-search-view" mode="horizontal">
+		<div className="c-search-view">
 			<Navbar>
 				<Container mode="horizontal">
-					<Toolbar>
+					<Toolbar className="c-toolbar--results">
 						<ToolbarLeft>
 							<ToolbarItem>
 								<ToolbarTitle>
@@ -425,47 +444,31 @@ const Search: FunctionComponent<SearchProps> = ({
 											id="sortBy"
 											options={orderOptions}
 											value={defaultOrder}
-											onChange={value => handleOrderChanged(value)}
+											onChange={(value) => handleOrderChanged(value)}
 										/>
 									</FormGroup>
 								</Form>
-								<Dropdown
+								<MoreOptionsDropdown
 									isOpen={isOptionsMenuOpen}
-									menuWidth="fit-content"
 									onOpen={() => setIsOptionsMenuOpen(true)}
 									onClose={() => setIsOptionsMenuOpen(false)}
-									placement="bottom-end"
-									triggerClassName="c-extra-options"
-								>
-									<DropdownButton>
-										<Button
-											type="tertiary"
-											icon="more-horizontal"
-											title={t('search/views/search___meer-opties')}
-											ariaLabel={t('search/views/search___meer-opties')}
-										/>
-									</DropdownButton>
-									<DropdownContent>
-										<Button
-											type="link"
-											className="c-menu__item"
-											label={t(
+									menuItems={[
+										{
+											icon: 'link',
+											id: 'copy_link',
+											label: t(
 												'search/views/search___kopieer-vaste-link-naar-deze-zoekopdracht'
-											)}
-											onClick={onCopySearchLinkClicked}
-										/>
-										{/* TODO: DISABLED_FEATURE Create link to create search assignment task */}
-										{/* <Button
-											type="link"
-											className="c-menu__item"
-											label={t('search/views/search___maak-van-deze-zoekopdracht-een-opdracht')}
-											onClick={() => {
-												setIsOptionsMenuOpen(false);
-												ToastService.info(t('search/views/search___nog-niet-geimplementeerd'));
-											}}
-										/> */}
-									</DropdownContent>
-								</Dropdown>
+											),
+										},
+										// {
+										// 	id: 'save',
+										// 	label: t(
+										// 		'search/views/search___maak-van-deze-zoekopdracht-een-opdracht'
+										// 	),
+										// },
+									]}
+									onOptionClicked={handleOptionClicked}
+								/>
 								<InteractiveTour showButton />
 							</Flex>
 						</ToolbarRight>
@@ -501,10 +504,18 @@ const Search: FunctionComponent<SearchProps> = ({
 									{hasFilters && (
 										<FormGroup inlineMode="shrink">
 											<Button
-												label={t(
+												label={
+													isMobileWidth()
+														? ''
+														: t(
+																'search/views/search___verwijder-alle-filters'
+														  )
+												}
+												ariaLabel={t(
 													'search/views/search___verwijder-alle-filters'
 												)}
-												type="link"
+												icon={isMobileWidth() ? 'trash-2' : undefined}
+												type={isMobileWidth() ? 'borderless' : 'link'}
 												onClick={deleteAllFilters}
 											/>
 										</FormGroup>
@@ -513,9 +524,10 @@ const Search: FunctionComponent<SearchProps> = ({
 							</div>
 						</Spacer>
 						<SearchFilterControls
-							filterState={filterState.filters}
+							filterState={filterState.filters || DEFAULT_FILTER_STATE}
 							handleFilterFieldChange={handleFilterFieldChange}
 							multiOptions={multiOptions}
+							onSearch={onSearchInSearchFilter}
 						/>
 					</Spacer>
 				</Container>
@@ -541,7 +553,7 @@ const Search: FunctionComponent<SearchProps> = ({
 					navigateUserRequestForm={navigateToUserRequestForm}
 				/>
 			)}
-		</Container>
+		</div>
 	);
 
 	return (

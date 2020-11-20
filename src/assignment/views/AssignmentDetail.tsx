@@ -1,3 +1,4 @@
+import classnames from 'classnames';
 import { get, isNil, isString } from 'lodash-es';
 import React, { FunctionComponent, ReactElement, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -7,15 +8,10 @@ import { Link } from 'react-router-dom';
 import {
 	BlockHeading,
 	Box,
-	Button,
 	Checkbox,
 	Container,
-	Dropdown,
-	DropdownButton,
-	DropdownContent,
 	Icon,
 	IconName,
-	MenuContent,
 	Navbar,
 	Spacer,
 	TagList,
@@ -28,7 +24,8 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
-import { getProfileId } from '../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../authentication/helpers/get-profile-id';
+import { getProfileName } from '../../authentication/helpers/get-profile-info';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import { FragmentList } from '../../collection/components';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
@@ -36,8 +33,10 @@ import { ErrorView } from '../../error/views';
 import { ItemVideoDescription } from '../../item/components';
 import { InteractiveTour, LoadingErrorLoadedComponent, LoadingInfo } from '../../shared/components';
 import Html from '../../shared/components/Html/Html';
-import { buildLink, CustomError, renderAvatar } from '../../shared/helpers';
+import MoreOptionsDropdown from '../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
+import { buildLink, CustomError, isMobileWidth, renderAvatar } from '../../shared/helpers';
 import { AssignmentLabelsService, ToastService } from '../../shared/services';
+import { trackEvents } from '../../shared/services/event-logging-service';
 import { ASSIGNMENTS_ID } from '../../workspace/workspace.const';
 import { AssignmentService } from '../assignment.service';
 import { AssignmentLayout, AssignmentRetrieveError } from '../assignment.types';
@@ -58,10 +57,6 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 	const [assignmentContent, setAssignmentContent] = useState<
 		Avo.Assignment.Content | null | undefined
 	>();
-	const [canEditAssignments, setCanEditAssignments] = useState<boolean | null>(null);
-	const [canCreateAssignmentResponse, setCanCreateAssignmentResponse] = useState<boolean | null>(
-		null
-	);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 
 	const [t] = useTranslation();
@@ -121,18 +116,30 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 				return;
 			}
 
-			// Create an assignmentResponse object to track the student viewing and finishing the assignment
-			// Currently we wait for this to complete
-			// so we can set the created assignment response on the tempAssignment object,
-			// so we don't need to do a refetch of the original assignment
-			const assignmentResponse = await AssignmentService.createAssignmentResponseObject(
-				response.assignment,
+			if (PermissionService.hasPerm(user, PermissionName.CREATE_ASSIGNMENT_RESPONSE)) {
+				// Create an assignmentResponse object to track the student viewing and finishing the assignment
+				// Currently we wait for this to complete
+				// so we can set the created assignment response on the tempAssignment object,
+				// so we don't need to do a refetch of the original assignment
+				const assignmentResponse = await AssignmentService.createAssignmentResponseObject(
+					response.assignment,
+					user
+				);
+
+				if (assignmentResponse) {
+					response.assignment.assignment_responses = [assignmentResponse];
+				}
+			}
+
+			trackEvents(
+				{
+					object: String(response.assignment.id),
+					object_type: 'assignment',
+					message: `Gebruiker ${getProfileName(user)} heeft een opdracht bekeken`,
+					action: 'view',
+				},
 				user
 			);
-
-			if (assignmentResponse) {
-				response.assignment.assignment_responses = [assignmentResponse];
-			}
 
 			setAssignment(response.assignment);
 			setAssignmentContent(response.assignmentContent);
@@ -152,24 +159,8 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 		}
 	}, [setAssignment, setAssignmentContent, setLoadingInfo, match.params.id, t, user]);
 
-	const checkPermissions = useCallback(async () => {
-		setCanEditAssignments(
-			await PermissionService.hasPermissions(PermissionName.EDIT_ASSIGNMENTS, user)
-		);
-		setCanCreateAssignmentResponse(
-			await PermissionService.hasPermissions(PermissionName.CREATE_ASSIGNMENT_RESPONSE, user)
-		);
-	}, [setCanEditAssignments, setCanCreateAssignmentResponse, user]);
-
 	useEffect(() => {
-		checkPermissions();
-	}, [checkPermissions]);
-
-	useEffect(() => {
-		if (isNil(canCreateAssignmentResponse)) {
-			return;
-		}
-		if (canCreateAssignmentResponse) {
+		if (PermissionService.hasPerm(user, PermissionName.VIEW_ASSIGNMENTS)) {
 			fetchAssignmentAndContent();
 		} else {
 			setLoadingInfo({
@@ -180,7 +171,7 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 				icon: 'lock',
 			});
 		}
-	}, [canCreateAssignmentResponse, fetchAssignmentAndContent, t]);
+	}, [fetchAssignmentAndContent, user, t]);
 
 	useEffect(() => {
 		if (assignment) {
@@ -191,6 +182,7 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 	}, [assignment]);
 
 	const handleExtraOptionsClick = async (itemId: 'archive') => {
+		setActionsDropdownOpen(false);
 		if (itemId === 'archive') {
 			try {
 				if (!assignment) {
@@ -287,6 +279,7 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 						location={location}
 						match={match}
 						user={user}
+						collection={assignmentContent as Avo.Collection.Collection}
 						{...rest}
 					/>
 				);
@@ -295,6 +288,7 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 					<ItemVideoDescription
 						itemMetaData={assignmentContent as Avo.Item.Item}
 						showDescription={content_layout === AssignmentLayout.PlayerAndText}
+						verticalLayout={isMobileWidth()}
 					/>
 				);
 			default:
@@ -359,11 +353,20 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 		);
 
 		return (
-			<div className="c-assignment-detail">
+			<div
+				className={classnames('c-assignment-detail', {
+					'c-assignment-detail--mobile': isMobileWidth(),
+				})}
+			>
 				<Navbar>
 					<Container mode="vertical" size="small" background="alt">
 						<Container mode="horizontal">
-							<Toolbar justify size="huge" className="c-toolbar--drop-columns-low-mq">
+							<Toolbar
+								justify
+								wrap={isMobileWidth()}
+								size="huge"
+								className="c-toolbar--drop-columns-low-mq"
+							>
 								<ToolbarLeft>
 									<ToolbarItem>
 										{renderBackLink()}
@@ -400,46 +403,30 @@ const AssignmentDetail: FunctionComponent<AssignmentProps> = ({
 											})}
 										</ToolbarItem>
 									)}
-									{canEditAssignments && (
+									{PermissionService.hasPerm(
+										user,
+										PermissionName.EDIT_ASSIGNMENTS
+									) && (
 										<ToolbarItem>
-											<Dropdown
+											<MoreOptionsDropdown
 												isOpen={isActionsDropdownOpen}
-												menuWidth="fit-content"
-												onClose={() => setActionsDropdownOpen(false)}
 												onOpen={() => setActionsDropdownOpen(true)}
-												placement="bottom-end"
-											>
-												<DropdownButton>
-													<Button
-														icon="more-horizontal"
-														type="secondary"
-														ariaLabel={t(
-															'assignment/views/assignment-detail___meer-opties'
-														)}
-														title={t(
-															'assignment/views/assignment-detail___meer-opties'
-														)}
-													/>
-												</DropdownButton>
-												<DropdownContent>
-													<MenuContent
-														menuItems={[
-															{
-																icon: 'archive',
-																id: 'archive',
-																label: assignment.is_archived
-																	? t(
-																			'assignment/views/assignment-detail___dearchiveer'
-																	  )
-																	: t(
-																			'assignment/views/assignment-detail___archiveer'
-																	  ),
-															},
-														]}
-														onClick={handleExtraOptionsClick as any}
-													/>
-												</DropdownContent>
-											</Dropdown>
+												onClose={() => setActionsDropdownOpen(false)}
+												menuItems={[
+													{
+														icon: 'archive',
+														id: 'archive',
+														label: assignment.is_archived
+															? t(
+																	'assignment/views/assignment-detail___dearchiveer'
+															  )
+															: t(
+																	'assignment/views/assignment-detail___archiveer'
+															  ),
+													},
+												]}
+												onOptionClicked={handleExtraOptionsClick as any}
+											/>
 										</ToolbarItem>
 									)}
 									<ToolbarItem>

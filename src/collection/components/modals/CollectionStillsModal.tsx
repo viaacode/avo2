@@ -51,18 +51,26 @@ const CollectionStillsModal: FunctionComponent<CollectionStillsModalProps> = ({
 				setVideoStills(await VideoStillService.getThumbnailsForCollection(collection));
 			} catch (err) {
 				console.error(err);
-				ToastService.danger('Het ophalen van de media thumbnails is mislukt.');
+				ToastService.danger(
+					t(
+						'collection/components/modals/collection-stills-modal___het-ophalen-van-de-media-thumbnails-is-mislukt'
+					)
+				);
 				setVideoStills([]);
 			}
 		};
 
 		fetchThumbnailImages();
-	}, [isOpen, collection]);
+	}, [isOpen, collection, t]);
 
 	const saveCoverImage = () => {
 		collection.thumbnail_path = selectedCoverImages[0];
 		onClose();
-		ToastService.success('De cover afbeelding is ingesteld.');
+		ToastService.success(
+			t(
+				'collection/components/modals/collection-stills-modal___de-cover-afbeelding-is-ingesteld'
+			)
+		);
 	};
 
 	return (

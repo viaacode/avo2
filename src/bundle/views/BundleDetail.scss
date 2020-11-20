@@ -6,6 +6,12 @@
 		max-height: 0;
 		overflow: hidden;
 	}
+
+	.c-bundle-toolbar__mobile {
+		> .c-toolbar__left {
+			width: calc(100% - 40px);
+		}
+	}
 }
 
 .c-collection-list__item {

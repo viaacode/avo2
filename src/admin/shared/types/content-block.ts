@@ -8,9 +8,9 @@ import {
 	HeadingType,
 	IconName,
 	ImageInfo,
-	RichEditorState,
 	SpacerOption,
 } from '@viaa/avo2-components';
+import { RichEditorState } from '@viaa/avo2-components/dist/esm/wysiwyg';
 import { Avo } from '@viaa/avo2-types';
 
 // OPTIONS
@@ -18,7 +18,13 @@ export type AlignOption = 'left' | 'right' | 'center';
 
 export type FillOption = 'cover' | 'contain' | 'auto';
 
-export type BlockGridFormatOption = 'squareSmall' | 'squareLarge' | '4:3' | '2:1' | '6:9';
+export type BlockGridFormatOption =
+	| 'squareSmall'
+	| 'squareLarge'
+	| '4:3'
+	| '2:1'
+	| '6:9'
+	| '400x150';
 
 export type WidthOption = 'full-width' | 'page-header' | string; // CSS width string: eg: 100%; 400px, 500px
 
@@ -73,42 +79,60 @@ export interface PaddingFieldState {
 }
 
 // CONTENT BLOCK CONFIG
-export interface ContentBlockMeta {
-	index: number;
-	config: ContentBlockConfig;
-}
 
-// CONTENT BLOCK
-export interface ContentBlockConfig {
-	id?: number;
-	errors?: ContentBlockErrors;
-	name: string;
-	components: ContentBlockComponentsConfig;
-	block: ContentBlockBlockConfig;
-	type: ContentBlockType;
-	anchor?: string;
-	position: number;
-}
-
-export interface ContentBlockComponentsConfig {
-	name?: string;
-	limits?: ContentBlockComponentsLimits;
-	state: ContentBlockComponentState;
-	fields: {
-		[key: string]: any;
-	};
-}
+// if 1 block, errors is a string[]. If multiple, it is a string[] index by their stateIndex, so string[][].
+export type ContentBlockErrors = { [key: string]: (string | string[])[] };
 
 export interface ContentBlockComponentsLimits {
 	min?: number;
 	max?: number;
 }
 
-export interface ContentBlockBlockConfig {
-	state: ContentBlockState;
-	fields: {
-		[key: string]: ContentBlockField;
-	};
+// must match the lookup enumeration `content_block_types` on GraphQL.
+export enum ContentBlockType {
+	AnchorLinks = 'ANCHOR_LINKS',
+	Buttons = 'BUTTONS',
+	CTAs = 'CTAS',
+	Heading = 'HEADING',
+	IFrame = 'IFRAME',
+	Image = 'IMAGE',
+	ImageGrid = 'IMAGE_GRID',
+	Intro = 'INTRO',
+	Klaar = 'KLAAR',
+	MediaGrid = 'MEDIA_GRID',
+	MediaPlayer = 'MEDIA_PLAYER',
+	MediaPlayerTitleTextButton = 'MEDIA_PLAYER_TITLE_TEXT_BUTTON',
+	Quote = 'QUOTE',
+	RichText = 'RICH_TEXT',
+	RichTextTwoColumns = 'RICH_TEXT_TWO_COLUMNS',
+	PageOverview = 'PAGE_OVERVIEW',
+	ProjectsSpotlight = 'PROJECTS_SPOTLIGHT',
+	Spotlight = 'SPOTLIGHT',
+	Hero = 'HERO',
+	Search = 'SEARCH',
+	ContentPageMeta = 'CONTENT_PAGE_META',
+	LogoGrid = 'LOGO_GRID',
+	UspGrid = 'USP_GRID',
+	Eventbrite = 'EVENTBRITE',
+}
+
+export enum ContentBlockEditor {
+	AlignSelect = 'AlignSelect',
+	Checkbox = 'Checkbox',
+	ColorSelect = 'ColorSelect',
+	ContentPicker = 'ContentPicker',
+	AnchorLinkSelect = 'AnchorLinkSelect',
+	ContentTypeAndLabelsPicker = 'ContentTypeAndLabelsPicker',
+	FileUpload = 'FileUpload',
+	IconPicker = 'IconPicker',
+	DatePicker = 'DatePicker',
+	MultiRange = 'MultiRange',
+	PaddingSelect = 'PaddingSelect',
+	Select = 'Select',
+	TextArea = 'TextArea',
+	TextInput = 'TextInput',
+	WYSIWYG = 'WYSIWYG',
+	UserGroupSelect = 'UserGroupSelect',
 }
 
 export interface ContentBlockField {
@@ -140,34 +164,6 @@ export interface ContentBlockFieldGroup {
 	};
 }
 
-// must match the lookup enumeration `content_block_types` on GraphQL.
-export enum ContentBlockType {
-	AnchorLinks = 'ANCHOR_LINKS',
-	Buttons = 'BUTTONS',
-	CTAs = 'CTAS',
-	Heading = 'HEADING',
-	IFrame = 'IFRAME',
-	Image = 'IMAGE',
-	ImageGrid = 'IMAGE_GRID',
-	Intro = 'INTRO',
-	Klaar = 'KLAAR',
-	MediaGrid = 'MEDIA_GRID',
-	MediaPlayer = 'MEDIA_PLAYER',
-	MediaPlayerTitleTextButton = 'MEDIA_PLAYER_TITLE_TEXT_BUTTON',
-	Quote = 'QUOTE',
-	RichText = 'RICH_TEXT',
-	RichTextTwoColumns = 'RICH_TEXT_TWO_COLUMNS',
-	PageOverview = 'PAGE_OVERVIEW',
-	ProjectsSpotlight = 'PROJECTS_SPOTLIGHT',
-	Spotlight = 'SPOTLIGHT',
-	Hero = 'HERO',
-	Search = 'SEARCH',
-	ContentPageMeta = 'CONTENT_PAGE_META',
-}
-
-// if 1 block, errors is a string[]. If multiple, it is a string[] index by their stateIndex, so string[][].
-export type ContentBlockErrors = { [key: string]: (string | string[])[] };
-
 /* CONTENT BLOCK STATE */
 export interface DefaultContentBlockState {
 	backgroundColor: Color;
@@ -184,71 +180,17 @@ export type ContentBlockState = DefaultContentBlockState;
 
 export type ContentBlockStateType = 'components' | 'block';
 
-export type ContentBlockStateOption =
-	| Partial<ContentBlockComponentState>
-	| Partial<ContentBlockComponentState>[]
-	| Partial<ContentBlockState>;
-
-/* CONTENT BLOCK EDITOR */
-export enum ContentBlockEditor {
-	AlignSelect = 'AlignSelect',
-	Checkbox = 'Checkbox',
-	ColorSelect = 'ColorSelect',
-	ContentPicker = 'ContentPicker',
-	AnchorLinkSelect = 'AnchorLinkSelect',
-	ContentTypeAndLabelsPicker = 'ContentTypeAndLabelsPicker',
-	FileUpload = 'FileUpload',
-	IconPicker = 'IconPicker',
-	DatePicker = 'DatePicker',
-	MultiRange = 'MultiRange',
-	PaddingSelect = 'PaddingSelect',
-	Select = 'Select',
-	TextArea = 'TextArea',
-	TextInput = 'TextInput',
-	WYSIWYG = 'WYSIWYG',
-	UserGroupSelect = 'UserGroupSelect',
+export interface ContentBlockBlockConfig {
+	state: ContentBlockState;
+	fields: {
+		[key: string]: ContentBlockField;
+	};
 }
-
-/* CONTENT BLOCKS */
-export type RepeatedContentBlockComponentState =
-	| AnchorLinksBlockComponentState
-	| ButtonsBlockComponentState
-	| Partial<CTAProps>
-	| ImageGridBlockComponentStateFields
-	| MediaGridBlockComponentState
-	| ImageInfo // project spotlight & spotlight
-	| RichTextBlockComponentState;
-
-export type SingleContentBlockComponentState =
-	| HeadingBlockComponentState
-	| Partial<BlockHeroProps>
-	| IFrameBlockComponentState
-	| ImageBlockComponentState
-	| IntroBlockComponentState
-	| KlaarBlockComponentState
-	| MediaPlayerBlockComponentState
-	| MediaPlayerTitleTextButtonBlockComponentState
-	| PageOverviewBlockComponentStateFields
-	| QuoteBlockComponentState
-	| RichTextBlockComponentState
-	| {}; // Search block & content page meta
-
-export type ContentBlockComponentState =
-	| RepeatedContentBlockComponentState[]
-	| SingleContentBlockComponentState;
 
 export interface HeadingBlockComponentState {
 	children: string;
 	type: HeadingTypeOption;
 	align: AlignOption;
-}
-
-export interface RichTextBlockComponentState {
-	content: string;
-	// Each rich text editor state prop has to and with 'RichEditorStateKey'
-	// So this can be removed before saving the page to the database in ContentService.removeRichEditorStateRecursively
-	contentRichEditorState: RichEditorState | undefined;
-	buttons?: ButtonsBlockComponentState[];
 }
 
 export interface ImageBlockComponentState {
@@ -286,6 +228,14 @@ export interface ButtonsBlockComponentState {
 	icon?: IconName;
 	type?: ButtonType;
 	navigate?: (buttonAction: ButtonAction) => void;
+}
+
+export interface RichTextBlockComponentState {
+	content: string;
+	// Each rich text editor state prop has to and with 'RichEditorStateKey'
+	// So this can be removed before saving the page to the database in ContentService.removeRichEditorStateRecursively
+	contentRichEditorState: RichEditorState | undefined;
+	buttons?: ButtonsBlockComponentState[];
 }
 
 export interface AnchorLinksBlockComponentState {
@@ -371,6 +321,63 @@ export interface MediaGridBlockState extends DefaultContentBlockState {
 export interface AnchorLinksBlockState extends DefaultContentBlockState {
 	align: AlignOption;
 	hasDividers: boolean;
+}
+
+export type RepeatedContentBlockComponentState =
+	| AnchorLinksBlockComponentState
+	| ButtonsBlockComponentState
+	| Partial<CTAProps>
+	| ImageGridBlockComponentStateFields
+	| MediaGridBlockComponentState
+	| ImageInfo // project spotlight & spotlight
+	| RichTextBlockComponentState;
+
+export type SingleContentBlockComponentState =
+	| HeadingBlockComponentState
+	| Partial<BlockHeroProps>
+	| IFrameBlockComponentState
+	| ImageBlockComponentState
+	| IntroBlockComponentState
+	| KlaarBlockComponentState
+	| MediaPlayerBlockComponentState
+	| MediaPlayerTitleTextButtonBlockComponentState
+	| PageOverviewBlockComponentStateFields
+	| QuoteBlockComponentState
+	| RichTextBlockComponentState
+	| {}; // Search block & content page meta
+
+export type ContentBlockComponentState =
+	| RepeatedContentBlockComponentState[]
+	| SingleContentBlockComponentState;
+
+export type ContentBlockStateOption =
+	| Partial<ContentBlockComponentState>
+	| Partial<ContentBlockComponentState>[]
+	| Partial<ContentBlockState>;
+
+export interface ContentBlockComponentsConfig {
+	name?: string;
+	limits?: ContentBlockComponentsLimits;
+	state: ContentBlockComponentState;
+	fields: {
+		[key: string]: any;
+	};
+}
+
+export interface ContentBlockConfig {
+	id?: number;
+	errors?: ContentBlockErrors;
+	name: string;
+	components: ContentBlockComponentsConfig;
+	block: ContentBlockBlockConfig;
+	type: ContentBlockType;
+	anchor?: string;
+	position: number;
+}
+
+export interface ContentBlockMeta {
+	index: number;
+	config: ContentBlockConfig;
 }
 
 export const DEFAULT_BUTTON_PROPS = {

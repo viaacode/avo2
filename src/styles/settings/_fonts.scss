@@ -20,6 +20,16 @@
 
 @font-face {
 	font-family: "Montserrat";
+	font-weight: 700;
+	font-style: italic;
+	src: url("/fonts/montserrat-bolditalic.eot");
+	src: url("/fonts/montserrat-bolditalic.eot?#iefix") format("embedded-opentype"),
+		 url("/fonts/montserrat-bolditalic.woff2") format("woff2"),
+		 url("/fonts/montserrat-bolditalic.woff") format("woff");
+}
+
+@font-face {
+	font-family: "Montserrat";
 	font-weight: 500;
 	font-style: normal;
 	src: url("/fonts/montserrat-medium.eot");

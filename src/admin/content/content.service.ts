@@ -1,9 +1,10 @@
-import { get, isFunction, omit } from 'lodash-es';
+import { get, isFunction, kebabCase, omit } from 'lodash-es';
 import moment from 'moment';
 
 import { Avo } from '@viaa/avo2-types';
 
 import { CustomError, performQuery, sanitizeHtml } from '../../shared/helpers';
+import { getOrderObject } from '../../shared/helpers/generate-order-gql-query';
 import { SanitizePreset } from '../../shared/helpers/sanitize/presets';
 import { ApolloCacheManager, dataService, ToastService } from '../../shared/services';
 import i18n from '../../shared/translations/i18n';
@@ -23,14 +24,12 @@ import {
 	DELETE_CONTENT_LABEL_LINKS,
 	GET_CONTENT_BY_ID,
 	GET_CONTENT_LABELS_BY_CONTENT_TYPE,
-	GET_CONTENT_PAGE_BY_PATH,
 	GET_CONTENT_PAGES,
-	GET_CONTENT_PAGES_BY_TITLE,
 	GET_CONTENT_TYPES,
-	GET_PROJECT_CONTENT_PAGES,
-	GET_PROJECT_CONTENT_PAGES_BY_TITLE,
+	GET_PUBLIC_CONTENT_PAGES_BY_TITLE,
+	GET_PUBLIC_PROJECT_CONTENT_PAGES,
+	GET_PUBLIC_PROJECT_CONTENT_PAGES_BY_TITLE,
 	INSERT_CONTENT,
-	INSERT_CONTENT_LABEL,
 	INSERT_CONTENT_LABEL_LINKS,
 	UPDATE_CONTENT_BY_ID,
 } from './content.gql';
@@ -42,12 +41,13 @@ import {
 } from './helpers/parsers';
 
 export class ContentService {
-	public static async getContentItems(limit: number): Promise<ContentPageInfo[] | null> {
+	public static async getPublicContentItems(limit: number): Promise<ContentPageInfo[] | null> {
 		const query = {
 			query: GET_CONTENT_PAGES,
 			variables: {
 				limit,
 				orderBy: { title: 'asc' },
+				where: { is_public: { _eq: true } },
 			},
 		};
 
@@ -60,9 +60,11 @@ export class ContentService {
 		) as ContentPageInfo[];
 	}
 
-	public static async getProjectContentItems(limit: number): Promise<ContentPageInfo[] | null> {
+	public static async getPublicProjectContentItems(
+		limit: number
+	): Promise<ContentPageInfo[] | null> {
 		const query = {
-			query: GET_PROJECT_CONTENT_PAGES,
+			query: GET_PUBLIC_PROJECT_CONTENT_PAGES,
 			variables: {
 				limit,
 				orderBy: { title: 'asc' },
@@ -78,16 +80,16 @@ export class ContentService {
 		);
 	}
 
-	public static async getContentItemsByTitle(
+	public static async getPublicContentItemsByTitle(
 		title: string,
 		limit?: number
 	): Promise<ContentPageInfo[]> {
 		const query = {
-			query: GET_CONTENT_PAGES_BY_TITLE,
+			query: GET_PUBLIC_CONTENT_PAGES_BY_TITLE,
 			variables: {
-				title,
 				limit: limit || null,
 				orderBy: { title: 'asc' },
+				where: { title: { _ilike: `%${title}%` }, is_public: { _eq: true } },
 			},
 		};
 
@@ -100,12 +102,12 @@ export class ContentService {
 		);
 	}
 
-	public static async getProjectContentItemsByTitle(
+	public static async getPublicProjectContentItemsByTitle(
 		title: string,
 		limit: number
 	): Promise<Partial<ContentPageInfo>[] | null> {
 		const query = {
-			query: GET_PROJECT_CONTENT_PAGES_BY_TITLE,
+			query: GET_PUBLIC_PROJECT_CONTENT_PAGES_BY_TITLE,
 			variables: {
 				title,
 				limit,
@@ -142,25 +144,6 @@ export class ContentService {
 		return convertToContentPageInfo(dbContentPage);
 	}
 
-	public static async fetchContentPageByPath(path: string): Promise<ContentPageInfo> {
-		const query = {
-			query: GET_CONTENT_PAGE_BY_PATH,
-			variables: {
-				path,
-			},
-		};
-
-		const dbContentPage = await performQuery(
-			query,
-			`${CONTENT_RESULT_PATH.GET}[0]`,
-			`Failed to retrieve content page by path: ${path}.`
-		);
-		if (!dbContentPage) {
-			throw new CustomError('No content page found with provided path', null, { path });
-		}
-		return convertToContentPageInfo(dbContentPage);
-	}
-
 	public static async getContentTypes(): Promise<
 		{ value: Avo.ContentPage.Type; label: string }[] | null
 	> {
@@ -174,12 +157,11 @@ export class ContentService {
 				})
 			);
 		} catch (err) {
-			console.error('Failed to retrieve content types.', err);
+			console.error('Failed to retrieve content types.', err, { query: 'GET_CONTENT_TYPES' });
 			ToastService.danger(
 				i18n.t(
 					'admin/content/content___er-ging-iets-mis-tijdens-het-ophalen-van-de-content-types'
-				),
-				false
+				)
 			);
 
 			return null;
@@ -230,48 +212,6 @@ export class ContentService {
 		}
 	}
 
-	public static async insertContentLabel(
-		label: string,
-		contentType: string
-	): Promise<Avo.ContentPage.Label> {
-		let variables: any;
-		try {
-			variables = {
-				label,
-				contentType,
-			};
-
-			const response = await dataService.mutate({
-				variables,
-				mutation: INSERT_CONTENT_LABEL,
-				update: ApolloCacheManager.clearContentLabels,
-			});
-
-			if (response.errors) {
-				throw new CustomError(
-					'Failed to insert content labels in the database because of graphql errors',
-					null,
-					{ response }
-				);
-			}
-
-			const contentLabel = get(response, 'data.insert_app_content_labels.returning[0]');
-
-			if (!contentLabel) {
-				throw new CustomError('The response does not contain a label', null, {
-					response,
-				});
-			}
-
-			return contentLabel;
-		} catch (err) {
-			throw new CustomError('Failed to insert content label in the database', err, {
-				variables,
-				query: 'INSERT_CONTENT_LABEL',
-			});
-		}
-	}
-
 	public static async insertContentLabelsLinks(
 		contentPageId: number,
 		labelIds: (number | string)[]
@@ -279,7 +219,7 @@ export class ContentService {
 		let variables: any;
 		try {
 			variables = {
-				objects: labelIds.map(labelId => ({
+				objects: labelIds.map((labelId) => ({
 					content_id: contentPageId,
 					label_id: labelId,
 				})),
@@ -331,20 +271,6 @@ export class ContentService {
 		}
 	}
 
-	private static getOrderObject(
-		sortColumn: ContentOverviewTableCols,
-		sortOrder: Avo.Search.OrderDirection
-	) {
-		const getOrderFunc: Function | undefined =
-			TABLE_COLUMN_TO_DATABASE_ORDER_OBJECT[sortColumn as ContentOverviewTableCols];
-
-		if (getOrderFunc) {
-			return [getOrderFunc(sortOrder)];
-		}
-
-		return [{ [sortColumn]: sortOrder }];
-	}
-
 	public static async fetchContentPages(
 		page: number,
 		sortColumn: ContentOverviewTableCols,
@@ -357,7 +283,11 @@ export class ContentService {
 				where,
 				offset: ITEMS_PER_PAGE * page,
 				limit: ITEMS_PER_PAGE,
-				orderBy: ContentService.getOrderObject(sortColumn, sortOrder),
+				orderBy: getOrderObject(
+					sortColumn,
+					sortOrder,
+					TABLE_COLUMN_TO_DATABASE_ORDER_OBJECT
+				),
 			};
 
 			const response = await dataService.query({
@@ -453,8 +383,7 @@ export class ContentService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content/content___er-ging-iets-mis-tijdens-het-opslaan-van-de-content'
-				),
-				false
+				)
 			);
 
 			return null;
@@ -505,12 +434,15 @@ export class ContentService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content/content___er-ging-iets-mis-tijdens-het-opslaan-van-de-content'
-				),
-				false
+				)
 			);
 
 			return null;
 		}
+	}
+
+	public static getPathOrDefault(contentPage: Partial<ContentPageInfo>): string {
+		return contentPage.path || `/${kebabCase(contentPage.title)}`;
 	}
 
 	/**
@@ -568,8 +500,10 @@ export class ContentService {
 		existingTitle: string
 	): Promise<string> => {
 		const titleWithoutCopy = existingTitle.replace(copyRegex, '');
-		const contentPages = await ContentService.getContentItemsByTitle(`%${titleWithoutCopy}`);
-		const titles = (contentPages || []).map(contentPage => contentPage.title);
+		const contentPages = await ContentService.getPublicContentItemsByTitle(
+			`%${titleWithoutCopy}`
+		);
+		const titles = (contentPages || []).map((contentPage) => contentPage.title);
 
 		let index = 0;
 		let candidateTitle: string;

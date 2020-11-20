@@ -38,7 +38,7 @@ export const GET_PERMISSION_GROUP_BY_ID = gql`
 			description
 			created_at
 			updated_at
-			permission_group_user_permissions {
+			permission_group_user_permissions(order_by: { permission: { description: asc } }) {
 				permissions {
 					id
 					label
@@ -51,7 +51,7 @@ export const GET_PERMISSION_GROUP_BY_ID = gql`
 
 export const GET_ALL_PERMISSIONS = gql`
 	query getAllPermissions {
-		users_permissions(order_by: { label: asc }) {
+		users_permissions(order_by: { description: asc }) {
 			id
 			label
 			description

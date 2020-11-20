@@ -7,27 +7,27 @@ import { ContentDetail, ContentEdit, ContentOverview } from './views';
 
 export const renderAdminContentRoutes = (): ReactNode[] => [
 	<SecuredRoute
-		key={CONTENT_PATH.CONTENT}
+		key={CONTENT_PATH.CONTENT_PAGE_OVERVIEW}
 		component={ContentOverview}
 		exact
-		path={CONTENT_PATH.CONTENT}
+		path={CONTENT_PATH.CONTENT_PAGE_OVERVIEW}
 	/>,
 	<SecuredRoute
-		key={CONTENT_PATH.CONTENT_CREATE}
+		key={CONTENT_PATH.CONTENT_PAGE_CREATE}
 		component={ContentEdit}
 		exact
-		path={CONTENT_PATH.CONTENT_CREATE}
+		path={CONTENT_PATH.CONTENT_PAGE_CREATE}
 	/>,
 	<SecuredRoute
-		key={CONTENT_PATH.CONTENT_DETAIL}
+		key={CONTENT_PATH.CONTENT_PAGE_DETAIL}
 		component={ContentDetail}
 		exact
-		path={CONTENT_PATH.CONTENT_DETAIL}
+		path={CONTENT_PATH.CONTENT_PAGE_DETAIL}
 	/>,
 	<SecuredRoute
-		key={CONTENT_PATH.CONTENT_EDIT}
+		key={CONTENT_PATH.CONTENT_PAGE_EDIT}
 		component={ContentEdit}
 		exact
-		path={CONTENT_PATH.CONTENT_EDIT}
+		path={CONTENT_PATH.CONTENT_PAGE_EDIT}
 	/>,
 ];

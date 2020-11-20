@@ -1,5 +1,6 @@
 import { get, isNil } from 'lodash-es';
 
+import { LabelObj } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { CustomError } from '../../shared/helpers';
@@ -9,8 +10,10 @@ import i18n from '../../shared/translations/i18n';
 import { ITEMS_PER_PAGE } from './content-page-label.const';
 import {
 	DELETE_CONTENT_PAGE_LABEL,
-	GET_CONTENT_PAGE_LABEL_BY_ID,
 	GET_CONTENT_PAGE_LABELS,
+	GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_ID,
+	GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_LABEL,
+	GET_CONTENT_PAGE_LABEL_BY_ID,
 	INSERT_CONTENT_PAGE_LABEL,
 	UPDATE_CONTENT_PAGE_LABEL,
 } from './content-page-label.gql';
@@ -21,14 +24,15 @@ export class ContentPageLabelService {
 		page: number,
 		sortColumn: ContentPageLabelOverviewTableCols,
 		sortOrder: Avo.Search.OrderDirection,
-		where: any
+		where: any,
+		itemsPerPage: number = ITEMS_PER_PAGE
 	): Promise<[ContentPageLabel[], number]> {
 		let variables: any;
 		try {
 			variables = {
 				where,
-				offset: ITEMS_PER_PAGE * page,
-				limit: ITEMS_PER_PAGE,
+				offset: itemsPerPage * page,
+				limit: itemsPerPage,
 				orderBy: [{ [sortColumn]: sortOrder }],
 			};
 			const response = await dataService.query({
@@ -75,6 +79,7 @@ export class ContentPageLabelService {
 				id: contentPageLabelObj.id,
 				label: contentPageLabelObj.label,
 				content_type: contentPageLabelObj.content_type,
+				link_to: contentPageLabelObj.link_to,
 				created_at: contentPageLabelObj.created_at,
 				updated_at: contentPageLabelObj.updated_at,
 			};
@@ -126,16 +131,17 @@ export class ContentPageLabelService {
 		}
 	}
 
-	static async updateContentPageLabel(contentPageLabel: ContentPageLabel) {
+	static async updateContentPageLabel(contentPageLabelInfo: ContentPageLabel) {
 		try {
 			const response = await dataService.mutate({
 				mutation: UPDATE_CONTENT_PAGE_LABEL,
 				variables: {
 					contentPageLabel: {
-						label: contentPageLabel.label,
-						content_type: contentPageLabel.content_type,
+						label: contentPageLabelInfo.label,
+						content_type: contentPageLabelInfo.content_type,
+						link_to: contentPageLabelInfo.link_to,
 					} as Partial<ContentPageLabel>,
-					contentPageLabelId: contentPageLabel.id,
+					contentPageLabelId: contentPageLabelInfo.id,
 				},
 				update: ApolloCacheManager.clearPermissionCache,
 			});
@@ -147,7 +153,7 @@ export class ContentPageLabelService {
 			}
 		} catch (err) {
 			throw new CustomError('Failed to update content page label in the database', err, {
-				contentPageLabel,
+				contentPageLabel: contentPageLabelInfo,
 				query: 'UPDATE_CONTENT_PAGE_LABEL',
 			});
 		}
@@ -191,8 +197,61 @@ export class ContentPageLabelService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content-page-labels/content-page-label___het-verwijderen-van-de-content-pagina-label-is-mislukt'
-				),
-				false
+				)
+			);
+		}
+	}
+
+	static async getContentPageLabelsByTypeAndLabels(
+		contentType: Avo.ContentPage.Type,
+		labels: string[]
+	): Promise<LabelObj[]> {
+		try {
+			const response = await dataService.query({
+				query: GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_LABEL,
+				variables: { contentType, labels },
+			});
+
+			if (response.errors) {
+				throw new CustomError('graphql response contains errors', null, { response });
+			}
+
+			return get(response, 'data.app_content_labels') || [];
+		} catch (err) {
+			throw new CustomError(
+				'Failed to get content page label objects by type and label',
+				err,
+				{
+					query: 'GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_LABEL',
+					variables: { contentType, labels },
+				}
+			);
+		}
+	}
+
+	static async getContentPageLabelsByTypeAndIds(
+		contentType: Avo.ContentPage.Type,
+		labelIds: number[]
+	): Promise<LabelObj[]> {
+		try {
+			const response = await dataService.query({
+				query: GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_ID,
+				variables: { contentType, labelIds },
+			});
+
+			if (response.errors) {
+				throw new CustomError('graphql response contains errors', null, { response });
+			}
+
+			return get(response, 'data.app_content_labels') || [];
+		} catch (err) {
+			throw new CustomError(
+				'Failed to get content page label objects by type and label',
+				err,
+				{
+					query: 'GET_CONTENT_PAGE_LABELS_BY_TYPE_AND_ID',
+					variables: { contentType, labelIds },
+				}
 			);
 		}
 	}

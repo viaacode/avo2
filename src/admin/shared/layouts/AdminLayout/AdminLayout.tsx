@@ -1,13 +1,11 @@
-import classnames from 'classnames';
 import React, { FunctionComponent, ReactNode } from 'react';
 
 import { Container, useSlot } from '@viaa/avo2-components';
 
-import { ActionsBar, TopBar } from '../../components';
+import { TopBar } from '../../components';
 
 import './AdminLayout.scss';
 import {
-	AdminLayoutActions,
 	AdminLayoutBody,
 	AdminLayoutHeader,
 	AdminLayoutTopBarCenter,
@@ -18,38 +16,41 @@ interface AdminLayoutProps {
 	children?: ReactNode;
 	className?: string;
 	pageTitle?: string;
-	showBackButton?: boolean;
+	onClickBackButton?: () => void;
+	size: 'small' | 'medium' | 'large' | 'full-width' | 'no-margin'; // TODO move this to a type in the Container component in the components repo
 }
 
 const AdminLayout: FunctionComponent<AdminLayoutProps> = ({
 	children,
 	className,
 	pageTitle,
-	showBackButton,
+	onClickBackButton,
+	size,
 }) => {
-	const actions = useSlot(AdminLayoutActions, children);
 	const body = useSlot(AdminLayoutBody, children);
 	const topBarCenter = useSlot(AdminLayoutTopBarCenter, children);
 	const topBarRight = useSlot(AdminLayoutTopBarRight, children);
 	const header = useSlot(AdminLayoutHeader, children);
 
 	return (
-		<div className={classnames('l-admin', { 'l-admin--with-actions': !!actions })}>
+		<div className="l-admin">
 			<TopBar
-				showBackButton={showBackButton}
+				onClickBackButton={onClickBackButton}
 				title={pageTitle}
 				center={topBarCenter}
 				right={topBarRight}
+				size={size === 'no-margin' ? 'full-width' : size}
 			/>
 			<div className="m-admin-layout-content">
 				{header}
-				{children && !body && (
+				{size !== 'no-margin' && (
 					<Container className={className} mode="vertical" size="small">
-						<Container mode="horizontal">{!body && children}</Container>
+						<Container mode="horizontal" size={size}>
+							{body || children}
+						</Container>
 					</Container>
 				)}
-				{body}
-				{actions && <ActionsBar fixed>{actions}</ActionsBar>}
+				{size === 'no-margin' && <>{body || children}</>}
 			</div>
 		</div>
 	);

@@ -32,7 +32,7 @@ import {
 	WidthOption,
 } from '../shared/types';
 
-import { AlignSelect, AnchorLinkSelect, ColorSelect, PaddingSelect } from './components';
+import { AlignSelect, ColorSelect, PaddingSelect } from './components';
 import {
 	ANCHOR_LINKS_BLOCK_CONFIG,
 	INITIAL_ANCHOR_LINKS_COMPONENTS_STATE,
@@ -47,6 +47,10 @@ import {
 } from './helpers/generators/content-page-meta';
 import { CTAS_BLOCK_CONFIG, INITIAL_CTAS_COMPONENTS_STATE } from './helpers/generators/ctas';
 import {
+	EVENTBRITE_BLOCK_CONFIG,
+	INITIAL_EVENTBRITE_COMPONENTS_STATE,
+} from './helpers/generators/eventbrite';
+import {
 	HEADING_BLOCK_CONFIG,
 	INITIAL_HEADING_COMPONENTS_STATE,
 } from './helpers/generators/heading';
@@ -59,6 +63,10 @@ import {
 } from './helpers/generators/image-grid';
 import { INITIAL_INTRO_COMPONENTS_STATE, INTRO_BLOCK_CONFIG } from './helpers/generators/intro';
 import { INITIAL_KLAAR_COMPONENTS_STATE, KLAAR_BLOCK_CONFIG } from './helpers/generators/klaar';
+import {
+	INITIAL_LOGO_GRID_COMPONENTS_STATE,
+	LOGO_GRID_BLOCK_CONFIG,
+} from './helpers/generators/logo-grid';
 import {
 	INITIAL_MEDIA_GRID_COMPONENTS_STATE,
 	MEDIA_GRID_BLOCK_CONFIG,
@@ -93,6 +101,10 @@ import {
 	INITIAL_SPOTLIGHT_COMPONENTS_STATE,
 	SPOTLIGHT_BLOCK_CONFIG,
 } from './helpers/generators/spotlight';
+import {
+	INITIAL_USP_GRID_COMPONENTS_STATE,
+	USP_GRID_BLOCK_CONFIG,
+} from './helpers/generators/usp-grid';
 
 export const CONTENT_BLOCKS_RESULT_PATH = {
 	GET: 'app_content_blocks',
@@ -174,7 +186,7 @@ export const GET_CONTENT_BLOCK_TYPE_OPTIONS: () => SelectOption<string>[] = () =
 		value: ContentBlockType.Quote,
 	},
 	{
-		label: i18n.t('admin/content-block/content-block___links'),
+		label: i18n.t('admin/content-block/helpers/generators/anchor-links___links'),
 		value: ContentBlockType.AnchorLinks,
 	},
 	{
@@ -189,11 +201,22 @@ export const GET_CONTENT_BLOCK_TYPE_OPTIONS: () => SelectOption<string>[] = () =
 		label: i18n.t('admin/content-block/content-block___pagina-metadata'),
 		value: ContentBlockType.ContentPageMeta,
 	},
+	{
+		label: i18n.t('admin/content-block/content-block___logos-sign-off'),
+		value: ContentBlockType.LogoGrid,
+	},
+	{
+		label: i18n.t('admin/content-block/content-block___usp'),
+		value: ContentBlockType.UspGrid,
+	},
+	{
+		label: i18n.t('admin/content-block/content-block___eventbrite'),
+		value: ContentBlockType.Eventbrite,
+	},
 ];
 
 export const EDITOR_TYPES_MAP = {
 	AlignSelect,
-	AnchorLinkSelect,
 	Checkbox,
 	ColorSelect,
 	ContentPicker,
@@ -232,10 +255,15 @@ export const CONTENT_BLOCK_CONFIG_MAP = {
 	[ContentBlockType.RichTextTwoColumns]: RICH_TEXT_TWO_COLUMNS_BLOCK_CONFIG,
 	[ContentBlockType.Search]: SEARCH_BLOCK_CONFIG,
 	[ContentBlockType.ContentPageMeta]: CONTENT_PAGE_META_BLOCK_CONFIG,
+	[ContentBlockType.LogoGrid]: LOGO_GRID_BLOCK_CONFIG,
+	[ContentBlockType.UspGrid]: USP_GRID_BLOCK_CONFIG,
+	[ContentBlockType.Eventbrite]: EVENTBRITE_BLOCK_CONFIG,
 };
 
 export const CONTENT_BLOCK_INITIAL_STATE_MAP: {
+	/* eslint-disable @typescript-eslint/no-unused-vars */
 	[type in ContentBlockType]: (position?: number) => ContentBlockComponentState;
+	/* eslint-enable @typescript-eslint/no-unused-vars */
 } = {
 	[ContentBlockType.AnchorLinks]: INITIAL_ANCHOR_LINKS_COMPONENTS_STATE,
 	[ContentBlockType.Buttons]: INITIAL_BUTTONS_COMPONENTS_STATE,
@@ -258,46 +286,68 @@ export const CONTENT_BLOCK_INITIAL_STATE_MAP: {
 	[ContentBlockType.RichTextTwoColumns]: INITIAL_RICH_TEXT_TWO_COLUMNS_COMPONENTS_STATE,
 	[ContentBlockType.Search]: INITIAL_SEARCH_COMPONENTS_STATE,
 	[ContentBlockType.ContentPageMeta]: INITIAL_CONTENT_PAGE_META_COMPONENTS_STATE,
+	[ContentBlockType.LogoGrid]: INITIAL_LOGO_GRID_COMPONENTS_STATE,
+	[ContentBlockType.UspGrid]: INITIAL_USP_GRID_COMPONENTS_STATE,
+	[ContentBlockType.Eventbrite]: INITIAL_EVENTBRITE_COMPONENTS_STATE,
 };
 
 // Options
+const transparentOption = {
+	label: i18n.t('admin/content-block/content-block___geen'),
+	value: Color.Transparent,
+};
+const whiteOption = {
+	label: i18n.t('admin/content-block/content-block___wit'),
+	value: Color.White,
+};
+const gray50Option = {
+	label: i18n.t('admin/content-block/content-block___grijs'),
+	value: Color.Gray50,
+};
+const softBlueOption = {
+	label: i18n.t('admin/content-block/content-block___zachtblauw'),
+	value: Color.SoftBlue,
+};
+const nightBlueOption = {
+	label: i18n.t('admin/content-block/content-block___nachtblauw'),
+	value: Color.NightBlue,
+};
+const tealOption = {
+	label: i18n.t('admin/content-block/content-block___appelblauwzeegroen'),
+	value: Color.Teal,
+};
+const tealBrightOption = {
+	label: i18n.t('admin/content-block/content-block___appelblauwzeegroen-helder'),
+	value: Color.TealBright,
+};
+const oceanGreenOption = {
+	label: i18n.t('admin/content-block/content-block___oceaangroen'),
+	value: Color.OceanGreen,
+};
+const yellowOption = {
+	label: i18n.t('admin/content-block/content-block___leerlingen-geel'),
+	value: Color.Yellow,
+};
+
 export const GET_BACKGROUND_COLOR_OPTIONS: () => SelectOption<Color>[] = () => [
-	{
-		label: i18n.t('admin/content-block/content-block___geen'),
-		value: Color.Transparent,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___wit'),
-		value: Color.White,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___grijs'),
-		value: Color.Gray50,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___nachtblauw'),
-		value: Color.NightBlue,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___zachtblauw'),
-		value: Color.SoftBlue,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___appelblauwzeegroen'),
-		value: Color.Teal,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___appelblauwzeegroen-helder'),
-		value: Color.TealBright,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___oceaangroen'),
-		value: Color.OceanGreen,
-	},
-	{
-		label: i18n.t('admin/content-block/content-block___leerlingen-geel'),
-		value: Color.Yellow,
-	},
+	transparentOption,
+	whiteOption,
+	gray50Option,
+	softBlueOption,
+	nightBlueOption,
+	tealOption,
+	tealBrightOption,
+	oceanGreenOption,
+	yellowOption,
+];
+
+export const GET_HERO_BACKGROUND_COLOR_OPTIONS: () => SelectOption<Color>[] = () => [
+	softBlueOption,
+	nightBlueOption,
+	tealOption,
+	tealBrightOption,
+	oceanGreenOption,
+	yellowOption,
 ];
 
 // TODO update list with required colors once provided in https://meemoo.atlassian.net/browse/AVO-216
@@ -320,7 +370,14 @@ export const GET_FOREGROUND_COLOR_OPTIONS: () => SelectOption<Color>[] = () => [
 	},
 ];
 
-export const GET_DARK_BACKGROUND_COLOR_OPTIONS: () => Color[] = () => [Color.NightBlue, Color.Teal];
+export const GET_DARK_BACKGROUND_COLOR_OPTIONS: () => Color[] = () => [
+	Color.SoftBlue,
+	Color.NightBlue,
+	Color.Teal,
+	Color.TealBright,
+	Color.OceanGreen,
+	Color.Yellow,
+];
 
 export const GET_ALIGN_OPTIONS: () => { label: string; value: AlignOption }[] = () => [
 	{
@@ -493,6 +550,10 @@ export const GET_IMAGE_GRID_FORMAT_OPTIONS: () => SelectOption<BlockGridFormatOp
 		label: i18n.t('admin/content-block/content-block___6-x-9-400-x-225'),
 		value: '6:9',
 	},
+	{
+		label: i18n.t('admin/content-block/content-block___400-x-150'),
+		value: '400x150',
+	},
 ];
 
 export const GET_PAGE_OVERVIEW_TAB_STYLE_OPTIONS: () => SelectOption<ContentTabStyle>[] = () => [
@@ -522,5 +583,32 @@ export const GET_PAGE_OVERVIEW_ITEM_STYLE_OPTIONS: () => SelectOption<ContentIte
 	{
 		label: i18n.t('admin/content-block/content-block___accrodions'),
 		value: 'ACCORDION',
+	},
+];
+
+export type PageOverviewOrderOptions =
+	| 'published_at__asc'
+	| 'published_at__desc'
+	| 'title__asc'
+	| 'title__desc';
+
+export const GET_PAGE_OVERVIEW_ORDER_OPTIONS: () => SelectOption<
+	PageOverviewOrderOptions
+>[] = () => [
+	{
+		label: i18n.t('admin/content-block/content-block___publicatie-datum-nieuw-oud'),
+		value: 'published_at__desc',
+	},
+	{
+		label: i18n.t('admin/content-block/content-block___publicatie-datum-oud-nieuw'),
+		value: 'published_at__asc',
+	},
+	{
+		label: i18n.t('admin/content-block/content-block___titel-a-z'),
+		value: 'title__asc',
+	},
+	{
+		label: i18n.t('admin/content-block/content-block___titel-z-a'),
+		value: 'title__desc',
 	},
 ];

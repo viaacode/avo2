@@ -10,21 +10,21 @@ import React, {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
 import {
 	Blankslate,
 	Button,
 	ButtonToolbar,
 	Container,
-	DropdownButton,
-	DropdownContent,
 	LinkTarget,
-	MenuContent,
+	MenuItemInfo,
 	Navbar,
 	Tabs,
 } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
+import { getUserGroupId } from '../../../authentication/helpers/get-profile-info';
 import {
 	PermissionName,
 	PermissionService,
@@ -33,11 +33,11 @@ import { redirectToClientPage } from '../../../authentication/helpers/redirects'
 import { GENERATE_SITE_TITLE } from '../../../constants';
 import { ContentPage } from '../../../content-page/views';
 import {
-	ControlledDropdown,
 	DeleteObjectModal,
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
+import MoreOptionsDropdown from '../../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
 import {
 	buildLink,
 	createDropdownMenuItem,
@@ -47,12 +47,14 @@ import {
 } from '../../../shared/helpers';
 import { useTabs } from '../../../shared/hooks';
 import { ApolloCacheManager, ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import {
 	AdminLayout,
 	AdminLayoutBody,
 	AdminLayoutHeader,
 	AdminLayoutTopBarRight,
 } from '../../shared/layouts';
+import { SpecialUserGroup } from '../../user-groups/user-group.const';
 import PublishContentPageModal from '../components/PublishContentPageModal';
 import { CONTENT_PATH, GET_CONTENT_DETAIL_TABS } from '../content.const';
 import { DELETE_CONTENT } from '../content.gql';
@@ -60,13 +62,20 @@ import { ContentService } from '../content.service';
 import { ContentDetailParams, ContentPageInfo } from '../content.types';
 import { isPublic } from '../helpers/get-published-state';
 
-import './ContentDetail.scss';
 import { ContentDetailMetaData } from './ContentDetailMetaData';
 
 export const CONTENT_PAGE_COPY = 'Kopie %index%: ';
 export const CONTENT_PAGE_COPY_REGEX = /^Kopie [0-9]+: /gi;
 
 interface ContentDetailProps extends DefaultSecureRouteProps<ContentDetailParams> {}
+
+const {
+	EDIT_ANY_CONTENT_PAGES,
+	EDIT_OWN_CONTENT_PAGES,
+	DELETE_ANY_CONTENT_PAGES,
+	UNPUBLISH_ANY_CONTENT_PAGE,
+	PUBLISH_ANY_CONTENT_PAGE,
+} = PermissionName;
 
 const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, user }) => {
 	const { id } = match.params;
@@ -87,15 +96,40 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 		GET_CONTENT_DETAIL_TABS()[0].id
 	);
 
-	// Computed
-	const isAdminUser = get(user, 'role.name', null) === 'admin';
+	const isAdminUser = getUserGroupId(user as any) === SpecialUserGroup.Admin;
 	const isContentProtected = get(contentPageInfo, 'is_protected', false);
 	const pageTitle = `Content: ${get(contentPageInfo, 'title', '')}`;
 	const description = contentPageInfo ? ContentService.getDescription(contentPageInfo) : '';
 
+	const hasPerm = (permission: PermissionName) => PermissionService.hasPerm(user, permission);
+
 	const fetchContentPageById = useCallback(async () => {
 		try {
-			setContentPageInfo(await ContentService.getContentPageById(id));
+			if (
+				!PermissionService.hasPerm(user, PermissionName.EDIT_ANY_CONTENT_PAGES) &&
+				!PermissionService.hasPerm(user, PermissionName.EDIT_OWN_CONTENT_PAGES)
+			) {
+				setLoadingInfo({
+					state: 'error',
+					message: t(
+						'admin/content/views/content-detail___je-hebt-geen-rechten-om-deze-content-pagina-te-bekijken'
+					),
+					icon: 'lock',
+				});
+				return;
+			}
+			const contentPageObj = await ContentService.getContentPageById(id);
+			if (!contentPageObj) {
+				setLoadingInfo({
+					state: 'error',
+					message: t(
+						'admin/content/views/content-detail___de-content-pagina-kon-niet-worden-gevonden-of-je-hebt-geen-rechten-om-deze-te-bekijken'
+					),
+					icon: 'lock',
+				});
+				return;
+			}
+			setContentPageInfo(contentPageObj);
 		} catch (err) {
 			console.error(
 				new CustomError('Failed to get content page by id', err, {
@@ -118,7 +152,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 				icon: notFound ? 'search' : 'alert-triangle',
 			});
 		}
-	}, [setContentPageInfo, setLoadingInfo, t, id]);
+	}, [setContentPageInfo, setLoadingInfo, user, t, id]);
 
 	useEffect(() => {
 		fetchContentPageById();
@@ -138,21 +172,19 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 			update: ApolloCacheManager.clearContentCache,
 		})
 			.then(() => {
-				history.push(CONTENT_PATH.CONTENT);
+				history.push(CONTENT_PATH.CONTENT_PAGE_OVERVIEW);
 				ToastService.success(
 					t(
 						'admin/content/views/content-detail___het-content-item-is-succesvol-verwijderd'
-					),
-					false
+					)
 				);
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error(err);
 				ToastService.danger(
 					t(
 						'admin/content/views/content-detail___het-verwijderen-van-het-content-item-is-mislukt'
-					),
-					false
+					)
 				);
 			});
 	};
@@ -185,8 +217,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 						? t('admin/content/views/content-detail___de-content-pagina-is-nu-publiek')
 						: t(
 								'admin/content/views/content-detail___de-content-pagina-is-nu-niet-meer-publiek'
-						  ),
-					false
+						  )
 				);
 			}
 		} catch (err) {
@@ -198,22 +229,25 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 			ToastService.danger(
 				t(
 					'admin/content/views/content-detail___het-opslaan-van-de-publiek-status-van-de-content-pagina-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 
 		setIsPublishModalOpen(false);
 	};
 
-	const CONTENT_DROPDOWN_ITEMS = [
-		createDropdownMenuItem(
-			'duplicate',
-			t('collection/views/collection-detail___dupliceer'),
-			'copy'
-		),
+	const CONTENT_DROPDOWN_ITEMS: MenuItemInfo[] = [
+		...(hasPerm(EDIT_ANY_CONTENT_PAGES)
+			? [
+					createDropdownMenuItem(
+						'duplicate',
+						t('collection/views/collection-detail___dupliceer'),
+						'copy'
+					),
+			  ]
+			: []),
 		...((!isContentProtected || (isContentProtected && isAdminUser)) &&
-		PermissionService.hasPerm(user, PermissionName.DELETE_ANY_CONTENT_PAGES)
+		hasPerm(DELETE_ANY_CONTENT_PAGES)
 			? [
 					createDropdownMenuItem(
 						'delete',
@@ -224,6 +258,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 	];
 
 	const executeAction = async (item: ReactText) => {
+		setIsOptionsMenuOpen(false);
 		switch (item) {
 			case 'duplicate':
 				try {
@@ -231,8 +266,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 						ToastService.danger(
 							t(
 								'admin/content/views/content-detail___de-content-pagina-kon-niet-worden-gedupliceerd'
-							),
-							false
+							)
 						);
 						return;
 					}
@@ -248,20 +282,20 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 						ToastService.danger(
 							t(
 								'admin/content/views/content-detail___de-gedupliceerde-content-pagina-kon-niet-worden-gevonden'
-							),
-							false
+							)
 						);
 						return;
 					}
 
 					redirectToClientPage(
-						buildLink(CONTENT_PATH.CONTENT_DETAIL, { id: duplicateContentPage.id }),
+						buildLink(CONTENT_PATH.CONTENT_PAGE_DETAIL, {
+							id: duplicateContentPage.id,
+						}),
 						history
 					);
 
 					ToastService.success(
-						t('admin/content/views/content-detail___de-content-pagina-is-gedupliceerd'),
-						false
+						t('admin/content/views/content-detail___de-content-pagina-is-gedupliceerd')
 					);
 				} catch (err) {
 					console.error('Failed to duplicate content page', err, {
@@ -271,8 +305,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 					ToastService.danger(
 						t(
 							'admin/content/views/content-detail___het-dupliceren-van-de-content-pagina-is-mislukt'
-						),
-						false
+						)
 					);
 				}
 				break;
@@ -286,61 +319,64 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 		}
 	};
 
-	const renderContentActions = () => (
-		<ButtonToolbar>
-			{((PermissionService.hasPerm(user, PermissionName.PUBLISH_ANY_CONTENT_PAGE) &&
-				!isPublic(contentPageInfo)) ||
-				(PermissionService.hasPerm(user, PermissionName.UNPUBLISH_ANY_CONTENT_PAGE) &&
-					isPublic(contentPageInfo))) && (
-				<Button
-					type="secondary"
-					icon={isPublic(contentPageInfo) ? 'unlock-3' : 'lock'}
-					label={t('admin/content/views/content-detail___publiceren')}
-					title={t(
-						'admin/content/views/content-detail___maak-de-content-pagina-publiek-niet-publiek'
-					)}
-					ariaLabel={t(
-						'admin/content/views/content-detail___maak-de-content-pagina-publiek-niet-publiek'
-					)}
-					onClick={() => setIsPublishModalOpen(true)}
-				/>
-			)}
-			<Button
-				type="secondary"
-				icon="eye"
-				label={t('admin/content/views/content-detail___preview')}
-				title={t('admin/content/views/content-detail___bekijk-deze-pagina-in-de-website')}
-				ariaLabel={t(
-					'admin/content/views/content-detail___bekijk-deze-pagina-in-de-website'
-				)}
-				onClick={handlePreviewClicked}
-			/>
-			<Button
-				label={t('admin/content/views/content-detail___bewerken')}
-				title={t('admin/content/views/content-detail___bewerk-deze-content-pagina')}
-				onClick={() => navigate(history, CONTENT_PATH.CONTENT_EDIT, { id })}
-			/>
-			<ControlledDropdown
-				isOpen={isOptionsMenuOpen}
-				menuWidth="fit-content"
-				onOpen={() => setIsOptionsMenuOpen(true)}
-				onClose={() => setIsOptionsMenuOpen(false)}
-				placement="bottom-end"
-			>
-				<DropdownButton>
+	const renderContentActions = () => {
+		const contentPageOwner = get(contentPageInfo, 'user_profile_id');
+		const isOwner = get(user, 'profile.id') === contentPageOwner;
+		const isAllowedToEdit =
+			hasPerm(EDIT_ANY_CONTENT_PAGES) || (hasPerm(EDIT_OWN_CONTENT_PAGES) && isOwner);
+
+		return (
+			<ButtonToolbar>
+				{((hasPerm(PUBLISH_ANY_CONTENT_PAGE) && !isPublic(contentPageInfo)) ||
+					(hasPerm(UNPUBLISH_ANY_CONTENT_PAGE) && isPublic(contentPageInfo))) && (
 					<Button
 						type="secondary"
-						icon="more-horizontal"
-						ariaLabel={t('collection/views/collection-detail___meer-opties')}
-						title={t('collection/views/collection-detail___meer-opties')}
+						icon={isPublic(contentPageInfo) ? 'unlock-3' : 'lock'}
+						label={t('admin/content/views/content-detail___publiceren')}
+						title={t(
+							'admin/content/views/content-detail___maak-de-content-pagina-publiek-niet-publiek'
+						)}
+						ariaLabel={t(
+							'admin/content/views/content-detail___maak-de-content-pagina-publiek-niet-publiek'
+						)}
+						onClick={() => setIsPublishModalOpen(true)}
 					/>
-				</DropdownButton>
-				<DropdownContent>
-					<MenuContent menuItems={CONTENT_DROPDOWN_ITEMS} onClick={executeAction} />
-				</DropdownContent>
-			</ControlledDropdown>
-		</ButtonToolbar>
-	);
+				)}
+				<Button
+					type="secondary"
+					icon="eye"
+					label={t('admin/content/views/content-detail___preview')}
+					title={t(
+						'admin/content/views/content-detail___bekijk-deze-pagina-in-de-website'
+					)}
+					ariaLabel={t(
+						'admin/content/views/content-detail___bekijk-deze-pagina-in-de-website'
+					)}
+					onClick={handlePreviewClicked}
+				/>
+				{isAllowedToEdit && (
+					<Link
+						to={buildLink(CONTENT_PATH.CONTENT_PAGE_EDIT, { id })}
+						className="a-link__no-styles"
+					>
+						<Button
+							label={t('admin/content/views/content-detail___bewerken')}
+							title={t(
+								'admin/content/views/content-detail___bewerk-deze-content-pagina'
+							)}
+						/>
+					</Link>
+				)}
+				<MoreOptionsDropdown
+					isOpen={isOptionsMenuOpen}
+					onOpen={() => setIsOptionsMenuOpen(true)}
+					onClose={() => setIsOptionsMenuOpen(false)}
+					menuItems={CONTENT_DROPDOWN_ITEMS}
+					onOptionClicked={executeAction}
+				/>
+			</ButtonToolbar>
+		);
+	};
 
 	// Render
 	const renderContentDetail = (contentPageInfo: ContentPageInfo | null): ReactElement | null => {
@@ -348,8 +384,7 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 			ToastService.danger(
 				t(
 					'admin/content/views/content-detail___de-content-pagina-kon-niet-worden-ingeladen'
-				),
-				false
+				)
 			);
 			return null;
 		}
@@ -371,7 +406,11 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 	};
 
 	return (
-		<AdminLayout showBackButton pageTitle={pageTitle}>
+		<AdminLayout
+			onClickBackButton={() => navigate(history, ADMIN_PATH.CONTENT_PAGE_OVERVIEW)}
+			pageTitle={pageTitle}
+			size="full-width"
+		>
 			<AdminLayoutTopBarRight>{renderContentActions()}</AdminLayoutTopBarRight>
 			<AdminLayoutHeader>
 				<Navbar background="alt" placement="top" autoHeight>
@@ -395,32 +434,30 @@ const ContentDetail: FunctionComponent<ContentDetailProps> = ({ history, match, 
 						content={get(contentPageInfo, 'seo_description') || description || ''}
 					/>
 				</MetaTags>
-				<div className="m-content-detail-preview">
-					<LoadingErrorLoadedComponent
-						loadingInfo={loadingInfo}
-						dataObject={contentPageInfo}
-						render={() => renderContentDetail(contentPageInfo)}
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={contentPageInfo}
+					render={() => renderContentDetail(contentPageInfo)}
+				/>
+				<DeleteObjectModal
+					deleteObjectCallback={handleDelete}
+					isOpen={isConfirmModalOpen}
+					onClose={() => setIsConfirmModalOpen(false)}
+					body={
+						isContentProtected
+							? t(
+									'admin/content/views/content-detail___opgelet-dit-is-een-beschermde-pagina'
+							  )
+							: ''
+					}
+				/>
+				{!!contentPageInfo && (
+					<PublishContentPageModal
+						contentPage={contentPageInfo}
+						isOpen={isPublishModalOpen}
+						onClose={handleShareModalClose}
 					/>
-					<DeleteObjectModal
-						deleteObjectCallback={handleDelete}
-						isOpen={isConfirmModalOpen}
-						onClose={() => setIsConfirmModalOpen(false)}
-						body={
-							isContentProtected
-								? t(
-										'admin/content/views/content-detail___opgelet-dit-is-een-beschermde-pagina'
-								  )
-								: ''
-						}
-					/>
-					{!!contentPageInfo && (
-						<PublishContentPageModal
-							contentPage={contentPageInfo}
-							isOpen={isPublishModalOpen}
-							onClose={handleShareModalClose}
-						/>
-					)}
-				</div>
+				)}
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

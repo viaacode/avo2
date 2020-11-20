@@ -10,15 +10,10 @@ import { ContentBlockConfig } from '../../shared/types';
 import { CONTENT_BLOCKS_RESULT_PATH } from '../content-block.const';
 import {
 	DELETE_CONTENT_BLOCK,
-	GET_CONTENT_BLOCKS_BY_CONTENT_ID,
 	INSERT_CONTENT_BLOCKS,
 	UPDATE_CONTENT_BLOCK,
 } from '../content-block.gql';
-import {
-	convertBlocksToDatabaseFormat,
-	convertBlockToDatabaseFormat,
-	parseContentBlocks,
-} from '../helpers';
+import { convertBlocksToDatabaseFormat, convertBlockToDatabaseFormat } from '../helpers';
 
 export class ContentBlockService {
 	/**
@@ -47,8 +42,7 @@ export class ContentBlockService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content-block/content-block___er-ging-iets-mis-tijdens-het-updaten-van-de-content-blocks'
-				),
-				false
+				)
 			);
 
 			return null;
@@ -73,8 +67,7 @@ export class ContentBlockService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content-block/content-block___er-ging-iets-mis-tijdens-het-verwijderen-van-de-content-blocks'
-				),
-				false
+				)
 			);
 
 			return null;
@@ -84,7 +77,7 @@ export class ContentBlockService {
 	private static cleanContentBlocksBeforeDatabaseInsert(
 		dbContentBlocks: Partial<Avo.ContentPage.Block>[]
 	) {
-		return (dbContentBlocks || []).map(block =>
+		return (dbContentBlocks || []).map((block) =>
 			omit(block, 'enum_content_block_type', '__typename', 'id')
 		);
 	}
@@ -105,7 +98,7 @@ export class ContentBlockService {
 			const dbBlocks: Partial<Avo.ContentPage.Block>[] = convertBlocksToDatabaseFormat(
 				contentBlockConfigs
 			);
-			(dbBlocks || []).forEach(block => (block.content_id = contentId));
+			(dbBlocks || []).forEach((block) => (block.content_id = contentId));
 			const response = await dataService.mutate({
 				mutation: INSERT_CONTENT_BLOCKS,
 				variables: {
@@ -131,48 +124,7 @@ export class ContentBlockService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content-block/content-block___er-ging-iets-mis-tijdens-het-opslaan-van-de-content-blocks'
-				),
-				false
-			);
-
-			return null;
-		}
-	}
-	/**
-	 * Retrieve content blocks by content id.
-	 *
-	 * @param contentId content page identifier
-	 *
-	 * @return content blocks
-	 */
-	public static async fetchContentBlocksByContentId(
-		contentId: number
-	): Promise<ContentBlockConfig[] | null> {
-		try {
-			const response = await dataService.query({
-				query: GET_CONTENT_BLOCKS_BY_CONTENT_ID,
-				variables: { contentId },
-			});
-
-			if (response.errors) {
-				throw new CustomError('Response contains errors', null, { response });
-			}
-
-			return parseContentBlocks(
-				get(response, `data.${CONTENT_BLOCKS_RESULT_PATH.GET}`) || []
-			);
-		} catch (err) {
-			console.error(
-				new CustomError('Failed to fetch content blocks by content page id', err, {
-					contentId,
-				})
-			);
-
-			ToastService.danger(
-				i18n.t(
-					'admin/content-block/content-block___er-ging-iets-mis-tijdens-het-ophalen-van-de-content-blocks'
-				),
-				false
+				)
 			);
 
 			return null;
@@ -193,7 +145,7 @@ export class ContentBlockService {
 	) {
 		try {
 			const initialContentBlockIds: number[] = compact(
-				initialContentBlocks.map(contentBlock => contentBlock.id)
+				initialContentBlocks.map((contentBlock) => contentBlock.id)
 			);
 			const currentContentBlockIds = contentBlockConfigs.reduce((acc: number[], curr) => {
 				if (has(curr, 'id')) {
@@ -206,7 +158,7 @@ export class ContentBlockService {
 			// Inserted content-blocks
 			const insertPromises: Promise<any>[] = [];
 			const insertedConfigs: ContentBlockConfig[] = contentBlockConfigs.filter(
-				config => !has(config, 'id')
+				(config) => !has(config, 'id')
 			);
 
 			if (insertedConfigs.length) {
@@ -218,10 +170,11 @@ export class ContentBlockService {
 			// Updated content-blocks
 			const updatePromises: Promise<any>[] = [];
 			const updatedConfigs = contentBlockConfigs.filter(
-				config => has(config, 'id') && initialContentBlockIds.includes(config.id as number)
+				(config) =>
+					has(config, 'id') && initialContentBlockIds.includes(config.id as number)
 			);
 
-			updatedConfigs.forEach(config =>
+			updatedConfigs.forEach((config) =>
 				updatePromises.push(ContentBlockService.updateContentBlock(config))
 			);
 
@@ -229,7 +182,7 @@ export class ContentBlockService {
 			const deletePromises: Promise<any>[] = [];
 			const deletedIds = without(initialContentBlockIds, ...currentContentBlockIds);
 
-			deletedIds.forEach(id =>
+			deletedIds.forEach((id) =>
 				deletePromises.push(ContentBlockService.deleteContentBlock(id))
 			);
 
@@ -251,8 +204,7 @@ export class ContentBlockService {
 			ToastService.danger(
 				i18n.t(
 					'admin/content-block/content-block___er-ging-iets-mis-tijdens-het-opslaan-van-de-content-blocks'
-				),
-				false
+				)
 			);
 
 			return null;

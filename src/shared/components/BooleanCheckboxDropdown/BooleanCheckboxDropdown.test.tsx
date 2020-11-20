@@ -10,7 +10,7 @@ describe('<BooleanCheckboxDropdown />', () => {
 			<BooleanCheckboxDropdown
 				label="Deleted"
 				id="is_deleted"
-				value={false}
+				value={null}
 				onChange={action('CheckboxDropdown changed')}
 			/>
 		);
@@ -23,7 +23,7 @@ describe('<BooleanCheckboxDropdown />', () => {
 			<BooleanCheckboxDropdown
 				label="Deleted"
 				id="is_deleted"
-				value={false}
+				value={null}
 				onChange={onChangeHandler}
 			/>
 		);

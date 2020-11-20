@@ -1,9 +1,9 @@
-import React, { FC } from 'react';
+import React, { FC, FunctionComponent } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
+import { compose } from 'redux';
 
 import {
 	BlockHeading,
-	BlockRichText,
 	Button,
 	ButtonAction,
 	ButtonType,
@@ -13,11 +13,17 @@ import {
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
+import {
+	PermissionName,
+	PermissionService,
+} from '../../../../../authentication/helpers/permission-service';
 import { navigateToContentType } from '../../../../../shared/helpers';
+import withUser, { UserProps } from '../../../../../shared/hocs/withUser';
 import { AlignOption, HeadingTypeOption } from '../../../../shared/types';
 import MediaPlayerWrapper from '../MediaPlayerWrapper/MediaPlayerWrapper';
+import RichTextWrapper from '../RichTextWrapper/RichTextWrapper';
 
-interface MediaPlayerTitleTextButtonWrapperProps extends RouteComponentProps {
+interface MediaPlayerTitleTextButtonWrapperProps {
 	mediaItem: ButtonAction;
 	mediaSrc?: string;
 	mediaPoster?: string;
@@ -35,7 +41,9 @@ interface MediaPlayerTitleTextButtonWrapperProps extends RouteComponentProps {
 	align: AlignOption;
 }
 
-export const MediaPlayerTitleTextButtonWrapper: FC<MediaPlayerTitleTextButtonWrapperProps> = ({
+export const MediaPlayerTitleTextButtonWrapper: FC<
+	MediaPlayerTitleTextButtonWrapperProps & RouteComponentProps & UserProps
+> = ({
 	mediaItem,
 	mediaSrc,
 	mediaPoster,
@@ -52,7 +60,11 @@ export const MediaPlayerTitleTextButtonWrapper: FC<MediaPlayerTitleTextButtonWra
 	history,
 	align,
 	mediaAutoplay,
+	user,
 }) => {
+	const shouldTitleLink =
+		PermissionService.hasPerm(user, PermissionName.VIEW_ANY_PUBLISHED_ITEMS) && !!mediaItem;
+
 	return (
 		<Grid className="c-item-video-description">
 			<Column size="2-7">
@@ -67,8 +79,18 @@ export const MediaPlayerTitleTextButtonWrapper: FC<MediaPlayerTitleTextButtonWra
 				/>
 			</Column>
 			<Column size="2-5" className={`u-text-${align}`}>
-				<BlockHeading type={headingType}>{headingTitle}</BlockHeading>
-				<BlockRichText elements={{ content }} />
+				<BlockHeading
+					type={headingType}
+					onClick={
+						shouldTitleLink
+							? () => navigateToContentType(mediaItem, history)
+							: undefined
+					}
+					className={shouldTitleLink ? 'u-clickable' : ''}
+				>
+					{headingTitle}
+				</BlockHeading>
+				<RichTextWrapper elements={{ content }} />
 				{buttonAction && (
 					<Button
 						icon={buttonIcon}
@@ -84,4 +106,7 @@ export const MediaPlayerTitleTextButtonWrapper: FC<MediaPlayerTitleTextButtonWra
 	);
 };
 
-export default withRouter(MediaPlayerTitleTextButtonWrapper);
+export default compose(
+	withRouter,
+	withUser
+)(MediaPlayerTitleTextButtonWrapper) as FunctionComponent<MediaPlayerTitleTextButtonWrapperProps>;

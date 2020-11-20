@@ -1,4 +1,4 @@
-import { capitalize, compact, get, startCase } from 'lodash-es';
+import { capitalize, compact, get, startCase, trimStart } from 'lodash-es';
 import React, { FunctionComponent } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -37,15 +37,36 @@ const SearchResultItem: FunctionComponent<SearchResultItemProps> = ({
 		);
 	};
 
+	const getMetaData = () => {
+		if (result.administrative_type === 'video' || result.administrative_type === 'audio') {
+			const duration = trimStart(result.duration_time, '0:');
+			if (duration.includes(':')) {
+				return duration;
+			}
+			return `0:${duration}`;
+		}
+		return ''; // TODO wait for https://meemoo.atlassian.net/browse/AVO-1107
+	};
+
+	const stripMarkdownLinks = (description: string) => {
+		return description.replace(/\[([^\]]+)]\([^)]+\)/gi, '$1');
+	};
+
+	let date: string;
+	if (result.administrative_type === 'collectie' || result.administrative_type === 'bundel') {
+		date = result.created_at;
+	} else {
+		date = result.dcterms_issued;
+	}
 	return (
 		<SearchResult
 			key={`search-result-${result.id}`}
 			type={toEnglishContentType(result.administrative_type)}
-			date={formatDate(result.dcterms_issued)}
+			date={formatDate(date)}
 			tags={getTags(result)}
 			viewCount={result.views_count || 0}
 			bookmarkCount={result.bookmarks_count || 0}
-			description={result.dcterms_abstract || ''}
+			description={stripMarkdownLinks(result.dcterms_abstract || '')}
 			isBookmarked={isBookmarked}
 			onToggleBookmark={(active: boolean) => handleBookmarkToggle(result.uid, active)}
 			onTagClicked={handleTagClicked}
@@ -66,6 +87,7 @@ const SearchResultItem: FunctionComponent<SearchResultItemProps> = ({
 						category={toEnglishContentType(result.administrative_type)}
 						src={result.thumbnail_path}
 						label={result.administrative_type}
+						meta={getMetaData()}
 					/>
 				</Link>
 			</SearchResultThumbnail>

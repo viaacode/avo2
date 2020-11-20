@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 
 import { SecuredRoute } from '../../authentication/components';
-import { PermissionName } from '../../authentication/helpers/permission-service';
+import { PermissionName } from '../../authentication/helpers/permission-names';
 
 import { COLLECTIONS_OR_BUNDLES_PATH } from './collections-or-bundles.const';
 import { CollectionsOrBundlesOverview } from './views';

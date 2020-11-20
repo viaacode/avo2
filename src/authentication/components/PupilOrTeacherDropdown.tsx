@@ -12,8 +12,9 @@ export interface PupilOrTeacherDropdownProps {
 	closeDropdown?: () => void;
 }
 
-const PupilOrTeacherDropdown: FunctionComponent<PupilOrTeacherDropdownProps &
-	RouteComponentProps> = ({ history, closeDropdown = () => {} }) => {
+const PupilOrTeacherDropdown: FunctionComponent<
+	PupilOrTeacherDropdownProps & RouteComponentProps
+> = ({ history, closeDropdown = () => {} }) => {
 	const [t] = useTranslation();
 
 	return (

@@ -1,8 +1,8 @@
 import { get, isEqual, isNil, isString } from 'lodash-es';
 import React, {
 	FunctionComponent,
+	ReactNode,
 	ReactText,
-	SetStateAction,
 	useCallback,
 	useEffect,
 	useState,
@@ -13,14 +13,10 @@ import {
 	Button,
 	Column,
 	convertToHtml,
-	DropdownButton,
-	DropdownContent,
 	Form,
 	FormGroup,
 	Grid,
 	IconName,
-	MenuContent,
-	RichEditorState,
 	TextInput,
 	Thumbnail,
 	Toggle,
@@ -29,17 +25,19 @@ import {
 	ToolbarLeft,
 	ToolbarRight,
 } from '@viaa/avo2-components';
+import { RichEditorState } from '@viaa/avo2-components/dist/esm/wysiwyg';
 import { Avo } from '@viaa/avo2-types';
 
-import {
-	ControlledDropdown,
-	DeleteObjectModal,
-	FlowPlayerWrapper,
-} from '../../../shared/components';
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { DeleteObjectModal, FlowPlayerWrapper } from '../../../shared/components';
+import MoreOptionsDropdown from '../../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
 import WYSIWYGWrapper from '../../../shared/components/WYSIWYGWrapper/WYSIWYGWrapper';
 import { WYSIWYG_OPTIONS_AUTHOR, WYSIWYG_OPTIONS_DEFAULT } from '../../../shared/constants';
 import { createDropdownMenuItem } from '../../../shared/helpers';
+import withUser, { UserProps } from '../../../shared/hocs/withUser';
 import { ToastService } from '../../../shared/services';
+import { trackEvents } from '../../../shared/services/event-logging-service';
+import { toDutchContentType } from '../../collection.types';
 import { CollectionAction } from '../CollectionOrBundleEdit';
 import CutFragmentModal from '../modals/CutFragmentModal';
 
@@ -52,12 +50,13 @@ interface FragmentEditProps {
 	numberOfFragments: number;
 	changeCollectionState: (action: CollectionAction) => void;
 	openOptionsId: number | null;
-	setOpenOptionsId: React.Dispatch<SetStateAction<number | null>>;
+	setOpenOptionsId: (id: number | null) => void;
 	fragment: Avo.Collection.Fragment;
 	allowedToAddLinks: boolean;
+	renderWarning?: () => ReactNode | null;
 }
 
-const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
+const FragmentEdit: FunctionComponent<FragmentEditProps & UserProps> = ({
 	type,
 	index,
 	collectionId,
@@ -67,15 +66,13 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 	setOpenOptionsId,
 	fragment,
 	allowedToAddLinks,
+	renderWarning = () => null,
+	user,
 }) => {
 	const [t] = useTranslation();
 
 	const [isCutModalOpen, setIsCutModalOpen] = useState<boolean>(false);
 	const [isDeleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
-	const [cuePoints, setCuePoints] = useState({
-		start: fragment.start_oc,
-		end: fragment.end_oc,
-	}); // TODO: Add type
 	const [descriptionRichEditorState, setDescriptionRichEditorState] = useState<
 		RichEditorState | undefined
 	>(undefined);
@@ -149,6 +146,19 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 			type: 'DELETE_FRAGMENT',
 		});
 
+		const objectType = type === 'collection' ? 'bundle' : 'collection';
+		trackEvents(
+			{
+				object: collectionId,
+				object_type: objectType,
+				message: `Gebruiker ${getProfileName(user)} heeft een ${
+					objectType === 'collection' ? 'fragment' : 'collectie'
+				} uit een ${toDutchContentType(objectType)} verwijderd`,
+				action: 'delete',
+			},
+			user
+		);
+
 		ToastService.success(
 			!isCollection
 				? t(
@@ -182,6 +192,7 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 	// };
 
 	const onClickDropdownItem = (item: ReactText) => {
+		setOpenOptionsId(null);
 		switch (item) {
 			// TODO: DISABLED FEATURE
 			// case 'duplicate':
@@ -204,8 +215,6 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 			default:
 				return null;
 		}
-
-		setOpenOptionsId(null);
 	};
 
 	// Render functions
@@ -342,36 +351,18 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 						</ToolbarLeft>
 						<ToolbarRight>
 							<ToolbarItem>
-								<ControlledDropdown
+								<MoreOptionsDropdown
 									isOpen={openOptionsId === fragment.id}
-									menuWidth="fit-content"
 									onOpen={() => setOpenOptionsId(fragment.id)}
 									onClose={() => setOpenOptionsId(null)}
-									placement="bottom-end"
-								>
-									<DropdownButton>
-										<Button
-											type="secondary"
-											icon="more-horizontal"
-											ariaLabel={t(
-												'collection/components/fragment/fragment-edit___meer-opties'
-											)}
-											title={t(
-												'collection/components/fragment/fragment-edit___meer-opties'
-											)}
-										/>
-									</DropdownButton>
-									<DropdownContent>
-										<MenuContent
-											menuItems={FRAGMENT_DROPDOWN_ITEMS}
-											onClick={onClickDropdownItem}
-										/>
-									</DropdownContent>
-								</ControlledDropdown>
+									menuItems={FRAGMENT_DROPDOWN_ITEMS}
+									onOptionClicked={onClickDropdownItem}
+								/>
 							</ToolbarItem>
 						</ToolbarRight>
 					</Toolbar>
 				</div>
+				{renderWarning()}
 				<div className="c-panel__body">
 					{fragment.type !== 'TEXT' && itemMetaData ? (
 						<Grid>
@@ -382,7 +373,10 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 										poster={
 											fragment.thumbnail_path || itemMetaData.thumbnail_path
 										}
-										cuePoints={cuePoints}
+										cuePoints={{
+											start: fragment.start_oc,
+											end: fragment.end_oc,
+										}}
 										canPlay={!isCutModalOpen && !isDeleteModalOpen}
 									/>
 								) : (
@@ -434,7 +428,6 @@ const FragmentEdit: FunctionComponent<FragmentEditProps> = ({
 					itemMetaData={itemMetaData}
 					changeCollectionState={changeCollectionState}
 					fragment={fragment}
-					updateCuePoints={setCuePoints}
 					index={index}
 				/>
 			)}
@@ -447,10 +440,11 @@ function areEqual(prevProps: FragmentEditProps, nextProps: FragmentEditProps) {
 		prevProps.numberOfFragments === nextProps.numberOfFragments &&
 		prevProps.collectionId === nextProps.collectionId &&
 		isEqual(prevProps.fragment, nextProps.fragment) &&
+		isEqual(prevProps.openOptionsId, nextProps.openOptionsId) &&
 		prevProps.allowedToAddLinks === nextProps.allowedToAddLinks &&
 		prevProps.index === nextProps.index &&
 		prevProps.type === nextProps.type
 	);
 }
 
-export default React.memo(FragmentEdit, areEqual);
+export default React.memo(withUser(FragmentEdit) as FunctionComponent<FragmentEditProps>, areEqual);

@@ -34,10 +34,10 @@ const PermissionGuard: FunctionComponent<PermissionGuardProps> = ({
 
 	useEffect(() => {
 		PermissionService.hasPermissions(permissions, user)
-			.then(response => {
+			.then((response) => {
 				setHasPermission(response);
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error('Failed to get permissions', err, { permissions, user });
 				setLoadingInfo({
 					state: 'error',

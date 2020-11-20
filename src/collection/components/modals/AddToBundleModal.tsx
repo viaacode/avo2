@@ -22,7 +22,8 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
-import { getProfileId, getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../../authentication/helpers/get-profile-id';
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
 import { CustomError } from '../../../shared/helpers';
 import { ToastService } from '../../../shared/services';
 import { trackEvents } from '../../../shared/services/event-logging-service';
@@ -66,7 +67,7 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 						setCreateNewBundle(true);
 					}
 				})
-				.catch(err => {
+				.catch((err) => {
 					console.error(err);
 					ToastService.danger(
 						t(
@@ -78,7 +79,7 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 	);
 
 	useEffect(() => {
-		fetchBundles().catch(err => {
+		fetchBundles().catch((err) => {
 			console.error('Failed to fetch bundles', err);
 			ToastService.danger(
 				t(
@@ -143,12 +144,12 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 			trackEvents(
 				{
 					object: String(collection.id),
-					object_type: 'collections',
-					message: `Gebruiker ${getProfileName(user)} heeft fragment ${get(
+					object_type: 'bundle',
+					message: `Gebruiker ${getProfileName(user)} heeft collectie ${get(
 						insertedFragments,
 						'[0].id'
-					)} toegevoegd aan collectie ${collection.id}`,
-					action: 'add_to_collection',
+					)} toegevoegd aan bundel ${collection.id}`,
+					action: 'add_to',
 				},
 				user
 			);
@@ -191,6 +192,16 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 			}
 
 			const insertedBundle = await CollectionService.insertCollection(newBundle);
+
+			trackEvents(
+				{
+					object: String(insertedBundle.id),
+					object_type: 'bundle',
+					message: `Gebruiker ${getProfileName(user)} heeft bundel aangemaakt`,
+					action: 'create',
+				},
+				user
+			);
 
 			// Add collection to bundle
 			await addCollectionToExistingBundle(insertedBundle);
@@ -242,7 +253,7 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 										checked={!createNewBundle}
 										value="existing"
 										name="collection"
-										onChange={checked => checked && setCreateNewBundle(false)}
+										onChange={() => setCreateNewBundle(false)}
 									/>
 									<div>
 										{bundles.length ? (
@@ -285,7 +296,7 @@ const AddToBundleModal: FunctionComponent<AddToBundleModalProps> = ({
 										checked={createNewBundle}
 										value="new"
 										name="bundle"
-										onChange={checked => checked && setCreateNewBundle(true)}
+										onChange={() => setCreateNewBundle(true)}
 									/>
 									<div>
 										<TextInput

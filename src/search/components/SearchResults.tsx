@@ -37,7 +37,7 @@ const SearchResults: FunctionComponent<SearchResultsProps> = ({
 	useEffect(() => {
 		CollectionService.getCollectionLabels()
 			.then(setCollectionLabels)
-			.catch(err => {
+			.catch((err) => {
 				console.error(new CustomError('Failed to get collection labels', err));
 				ToastService.danger(
 					t(

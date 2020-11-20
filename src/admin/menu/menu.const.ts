@@ -5,7 +5,7 @@ import { ROUTE_PARTS } from '../../shared/constants';
 import i18n from '../../shared/translations/i18n';
 
 export const MENU_PATH = {
-	MENU: `/${ROUTE_PARTS.admin}/${ROUTE_PARTS.menu}`,
+	MENU_OVERVIEW: `/${ROUTE_PARTS.admin}/${ROUTE_PARTS.menu}`,
 	MENU_CREATE: `/${ROUTE_PARTS.admin}/${ROUTE_PARTS.menu}/${ROUTE_PARTS.create}`,
 	MENU_DETAIL: `/${ROUTE_PARTS.admin}/${ROUTE_PARTS.menu}/:menu`,
 	MENU_ITEM_CREATE: `/${ROUTE_PARTS.admin}/${ROUTE_PARTS.menu}/:menu/${ROUTE_PARTS.create}`,
@@ -15,7 +15,7 @@ export const MENU_PATH = {
 export const GET_MENU_OVERVIEW_TABLE_COLS: () => TableColumn[] = () => [
 	{ id: 'placement', label: i18n.t('admin/menu/menu___naam') },
 	{ id: 'description', label: i18n.t('admin/menu/menu___omschrijving') },
-	{ id: 'actions', label: '' },
+	{ id: 'actions', tooltip: i18n.t('admin/menu/menu___acties') },
 ];
 
 export const INITIAL_MENU_FORM = (placement: string = ''): Partial<Avo.Menu.Menu> => ({

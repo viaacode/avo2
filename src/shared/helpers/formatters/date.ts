@@ -8,11 +8,7 @@ type DateLikeNullable = DateLike | undefined | null;
  * Converts a date from format 2000-12-31 to 31/12/2000
  */
 export function reorderDate(dateString: string | null, separator: string = '/'): string {
-	return (dateString || '')
-		.substring(0, 10)
-		.split('-')
-		.reverse()
-		.join(separator);
+	return (dateString || '').substring(0, 10).split('-').reverse().join(separator);
 }
 
 export function normalizeTimestamp(timestamp: DateLike): Moment {
@@ -43,22 +39,20 @@ export function fromNow(timestamp: DateLikeNullable) {
 	return normalizeTimestamp(timestamp).fromNow();
 }
 
-export function formatTimestamp(timestamp: DateLikeNullable) {
+export function formatTimestamp(timestamp: DateLikeNullable, includeSeconds: boolean = true) {
 	if (!timestamp) {
 		return '';
 	}
 	return normalizeTimestamp(timestamp)
-		.toDate()
-		.toLocaleString();
+		.local()
+		.format(`DD-MM-YYYY HH:mm${includeSeconds ? ':ss' : ''}`);
 }
 
 export function formatDate(timestamp: DateLikeNullable) {
 	if (!timestamp) {
 		return '';
 	}
-	return normalizeTimestamp(timestamp)
-		.toDate()
-		.toLocaleDateString();
+	return normalizeTimestamp(timestamp).local().format('DD-MM-YYYY');
 }
 
 export function toIsoDate(timestamp: DateLikeNullable) {

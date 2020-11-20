@@ -1,0 +1,34 @@
+.a-delete-user__grid {
+	.c-radio {
+		margin: 13px 0;
+	}
+}
+
+.a-delete-user__image {
+	background-size: contain;
+	background-position: center;
+	background-repeat: no-repeat;
+	width: 100%;
+	height: 100%;
+	min-height: 330px;
+
+	&.DELETE_PRIVATE_KEEP_NAME {
+		background-image: url('/images/delete-user/delete-user-images-1-delete-private-keep-name.svg');
+	}
+
+	&.TRANSFER_PUBLIC {
+		background-image: url('/images/delete-user/delete-user-images-2-transfer-public.svg');
+	}
+
+	&.TRANSFER_ALL {
+		background-image: url('/images/delete-user/delete-user-images-3-transfer-all.svg');
+	}
+
+	&.ANONYMIZE_PUBLIC {
+		background-image: url('/images/delete-user/delete-user-images-4-anonymize-public.svg');
+	}
+
+	&.DELETE_ALL {
+		background-image: url('/images/delete-user/delete-user-images-5-delete-all.svg');
+	}
+}

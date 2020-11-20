@@ -115,7 +115,7 @@ const DeleteCollectionModal: FunctionComponent<DeleteCollectionModalProps> = ({
 					)}
 				</p>
 				<ul>
-					{(assignments || []).map(assigment => (
+					{(assignments || []).map((assigment) => (
 						<li key={assigment.id}>
 							<Link
 								to={buildLink(APP_PATH.ASSIGNMENT_EDIT.route, {

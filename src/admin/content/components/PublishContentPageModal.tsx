@@ -10,7 +10,6 @@ import {
 	FormGroup,
 	Modal,
 	ModalBody,
-	RadioButton,
 	RadioButtonGroup,
 	Spacer,
 	Toolbar,
@@ -100,48 +99,30 @@ const PublishContentPageModal: FunctionComponent<PublishContentPageModalProps> =
 							{t('admin/content/components/share-content-page-modal___zichtbaarheid')}
 						</BlockHeading>
 					</Spacer>
-					<RadioButtonGroup>
-						<RadioButton
-							key="private"
-							name="private"
-							label={t('admin/content/components/share-content-page-modal___prive')}
-							value="private"
-							checked={selectedOption === 'private'}
-							onChange={checked => {
-								if (checked) {
-									setSelectedOption('private');
-								}
-							}}
-						/>
-						<RadioButton
-							key="public"
-							name="public"
-							label={t(
-								'admin/content/components/share-content-page-modal___openbaar'
-							)}
-							value="public"
-							checked={selectedOption === 'public'}
-							onChange={checked => {
-								if (checked) {
-									setSelectedOption('public');
-								}
-							}}
-						/>
-						<RadioButton
-							key="timebound"
-							name="timebound"
-							label={t(
-								'admin/content/components/share-content-page-modal___tijdsgebonden'
-							)}
-							value="timebound"
-							checked={selectedOption === 'timebound'}
-							onChange={checked => {
-								if (checked) {
-									setSelectedOption('timebound');
-								}
-							}}
-						/>
-					</RadioButtonGroup>
+					<RadioButtonGroup
+						options={[
+							{
+								label: t(
+									'admin/content/components/share-content-page-modal___prive'
+								),
+								value: 'private',
+							},
+							{
+								label: t(
+									'admin/content/components/share-content-page-modal___openbaar'
+								),
+								value: 'public',
+							},
+							{
+								label: t(
+									'admin/content/components/share-content-page-modal___tijdsgebonden'
+								),
+								value: 'timebound',
+							},
+						]}
+						value={selectedOption}
+						onChange={setSelectedOption as (value: string) => void}
+					/>
 				</FormGroup>
 				<Spacer margin="left-large">
 					<Form>
@@ -152,7 +133,7 @@ const PublishContentPageModal: FunctionComponent<PublishContentPageModalProps> =
 						>
 							<DatePicker
 								value={publishAt ? new Date(publishAt) : null}
-								onChange={date => setPublishAt(date ? date.toISOString() : null)}
+								onChange={(date) => setPublishAt(date ? date.toISOString() : null)}
 								showTimeInput={true}
 								disabled={selectedOption !== 'timebound'}
 							/>
@@ -164,7 +145,9 @@ const PublishContentPageModal: FunctionComponent<PublishContentPageModalProps> =
 						>
 							<DatePicker
 								value={depublishAt ? new Date(depublishAt) : null}
-								onChange={date => setDepublishAt(date ? date.toISOString() : null)}
+								onChange={(date) =>
+									setDepublishAt(date ? date.toISOString() : null)
+								}
 								showTimeInput={true}
 								disabled={selectedOption !== 'timebound'}
 							/>

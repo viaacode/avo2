@@ -19,9 +19,7 @@ describe('search > store > selectors', () => {
 				message: LoginMessage.LOGGED_IN,
 				userInfo: {} as Avo.User.User,
 				acceptedConditions: true,
-				sessionExpiresAt: moment()
-					.add(1, 'days')
-					.toString(),
+				sessionExpiresAt: moment().add(1, 'days').toString(),
 			},
 			loading: false,
 			error: false,

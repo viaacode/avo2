@@ -4,7 +4,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 import { Link } from 'react-router-dom';
 
-import { Button, ButtonToolbar, Container, Spacer, Table } from '@viaa/avo2-components';
+import { Button, ButtonToolbar, Spacer, Table } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
@@ -116,7 +116,10 @@ const MenuOverview: FunctionComponent<MenuOverviewProps> = ({ history }) => {
 	};
 
 	return (
-		<AdminLayout pageTitle={t('admin/menu/views/menu-overview___navigatie-overzicht')}>
+		<AdminLayout
+			pageTitle={t('admin/menu/views/menu-overview___navigatie-overzicht')}
+			size="large"
+		>
 			{!!menus.length && (
 				<AdminLayoutTopBarRight>
 					<Button
@@ -139,15 +142,11 @@ const MenuOverview: FunctionComponent<MenuOverviewProps> = ({ history }) => {
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<DataQueryComponent
-							renderData={renderMenuOverview}
-							resultPath="app_content_nav_elements"
-							query={GET_MENUS}
-						/>
-					</Container>
-				</Container>
+				<DataQueryComponent
+					renderData={renderMenuOverview}
+					resultPath="app_content_nav_elements"
+					query={GET_MENUS}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

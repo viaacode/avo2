@@ -27,7 +27,19 @@ export class ApolloCacheManager {
 		ApolloCacheManager.deleteFromCache(cache, 'app_item_bookmarks');
 		ApolloCacheManager.deleteFromCache(cache, 'app_item_views');
 		ApolloCacheManager.deleteFromCache(cache, 'app_item_plays');
+		ApolloCacheManager.deleteFromCache(cache, 'app_collection_bookmarks');
+		ApolloCacheManager.deleteFromCache(cache, 'app_collection_views');
+		ApolloCacheManager.deleteFromCache(cache, 'app_collection_plays');
 	}
+
+	public static clearItemCache(cache: ApolloCache) {
+		ApolloCacheManager.deleteFromCache(cache, 'app_item_meta');
+	}
+
+	public static clearSharedItemsCache(cache: ApolloCache) {
+		ApolloCacheManager.deleteFromCache(cache, 'shared_items');
+	}
+
 	/**
 	 * Clear all collection aggregate related data from the cache
 	 * eg: app_collections, app_collection_fragments, app_collections_aggregate
@@ -84,6 +96,14 @@ export class ApolloCacheManager {
 
 	public static clearInteractiveTourCache = (cache: ApolloCache) =>
 		ApolloCacheManager.deleteFromCache(cache, 'app_interactive_tour');
+
+	public static clearUserCache = (cache: ApolloCache) => {
+		ApolloCacheManager.deleteFromCache(cache, 'shared_users');
+		ApolloCacheManager.deleteFromCache(cache, 'users_profile');
+	};
+
+	public static clearTranslations = (cache: ApolloCache) =>
+		ApolloCacheManager.deleteFromCache(cache, 'app_site_variables');
 
 	private static deleteFromCache(cache: ApolloCache, substring: string) {
 		Object.keys(cache.data.data).forEach((key: string) => {

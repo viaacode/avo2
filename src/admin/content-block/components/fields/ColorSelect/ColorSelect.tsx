@@ -26,7 +26,7 @@ const ColorSelect: FunctionComponent<ColorSelectProps> = ({
 	...rest
 }) => {
 	const renderLabel = ({ label, value }: ReactSelectOption<string>) => {
-		const option: ColorOption | undefined = options.find(option => option.value === value);
+		const option: ColorOption | undefined = options.find((option) => option.value === value);
 		return (
 			<div key={`color-select-${label}-${value}`}>
 				<Flex>

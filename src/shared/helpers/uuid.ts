@@ -5,7 +5,5 @@ export function isUuid(id: string) {
 }
 
 export function generateRandomId() {
-	return Math.random()
-		.toString()
-		.substring(2, 15);
+	return Math.random().toString().substring(2, 15);
 }

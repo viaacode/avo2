@@ -1,0 +1,27 @@
+version: "3.1"
+services:
+  testproject-agent:
+    image: testproject/agent:latest
+    container_name: testproject-agent
+    depends_on:
+      - chrome
+      - firefox
+    volumes:
+      - ./agent:/var/testproject/agent
+    environment:
+      CHROME: "chrome:4444"
+      FIREFOX: "firefox:4444"
+    env_file:
+      - .env
+    expose:
+      - 8585
+  chrome:
+    image: selenium/standalone-chrome
+    volumes:
+      - ./shm:/dev/shm
+  firefox:
+    image: selenium/standalone-firefox
+    volumes:
+      - ./shm:/dev/shm
+
+

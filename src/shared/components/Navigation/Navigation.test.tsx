@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Link, MemoryRouter } from 'react-router-dom';
 
 import { APP_PATH } from '../../../constants';
 import { getMockRouterProps } from '../../mocks/route-components-props-mock';
-import mockUser from '../../mocks/user-mock';
 
 import { Navigation } from './Navigation';
 
@@ -28,13 +27,13 @@ const linkLoginState: {
 function checkLinks(menuItems: ReactWrapper<any, any>, loggedIn: boolean) {
 	const links = menuItems.find(Link);
 
-	links.forEach(link => {
+	links.forEach((link) => {
 		const to: Location = link.prop('to') as Location;
 		if (to) {
 			expect(link.text()).toBeTruthy();
 			expect(
 				Object.values(APP_PATH)
-					.map(routeInfo => routeInfo.route)
+					.map((routeInfo) => routeInfo.route)
 					.includes(to.pathname)
 			).toEqual(true);
 			if (loggedIn) {
@@ -60,7 +59,7 @@ describe('<Navigation />', () => {
 		// https://redux.js.org/recipes/writing-tests#connected-components
 		mount(
 			<MemoryRouter>
-				<Navigation {...mockProps} user={undefined as any} />
+				<Navigation {...mockProps} />
 			</MemoryRouter>
 		);
 	});
@@ -68,7 +67,7 @@ describe('<Navigation />', () => {
 	it('Should correctly render navbar links when logged out on desktop', () => {
 		const navigationComponent = mount(
 			<Router>
-				<Navigation {...mockProps} user={undefined as any} />
+				<Navigation {...mockProps} />
 			</Router>
 		);
 
@@ -88,7 +87,7 @@ describe('<Navigation />', () => {
 	it('Should correctly render navbar links when logged in on desktop', () => {
 		const navigationComponent = mount(
 			<Router>
-				<Navigation {...mockProps} user={mockUser} />
+				<Navigation {...mockProps} />
 			</Router>
 		);
 

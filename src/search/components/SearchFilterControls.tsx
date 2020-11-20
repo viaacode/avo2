@@ -1,13 +1,15 @@
+import classnames from 'classnames';
 import { cloneDeep, forEach, get, omit, uniqBy } from 'lodash-es';
 import React, { FunctionComponent, ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Accordion, AccordionBody, Spacer } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { CollectionService } from '../../collection/collection.service';
 import { CheckboxDropdownModal, CheckboxOption, DateRangeDropdown } from '../../shared/components';
 import { LANGUAGES } from '../../shared/constants';
-import { CustomError } from '../../shared/helpers';
+import { CustomError, isMobileWidth } from '../../shared/helpers';
 import { ToastService } from '../../shared/services';
 import { SearchFilterControlsProps, SearchFilterMultiOptions } from '../search.types';
 
@@ -21,6 +23,7 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 	filterState,
 	handleFilterFieldChange,
 	multiOptions,
+	onSearch,
 }) => {
 	const [t] = useTranslation();
 
@@ -29,7 +32,7 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 	useEffect(() => {
 		CollectionService.getCollectionLabels()
 			.then(setCollectionLabels)
-			.catch(err => {
+			.catch((err) => {
 				console.error(new CustomError('Failed to get collection labels', err));
 				ToastService.danger(
 					t(
@@ -48,7 +51,7 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 			combinedMultiOptions[filterName] = uniqBy(
 				[
 					...(combinedMultiOptions[filterName] || []),
-					...(values || []).map(val => ({ option_name: val, option_count: 0 })),
+					...(values || []).map((val) => ({ option_name: val, option_count: 0 })),
 				],
 				'option_name'
 			);
@@ -59,7 +62,7 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 	const renderCheckboxDropdownModal = (
 		label: string,
 		propertyName: Avo.Search.FilterProp,
-		disabled: boolean = false,
+		disabled = false,
 		labelsMapping?: { [id: string]: string }
 	): ReactNode => {
 		const checkboxMultiOptions = (getCombinedMultiOptions()[propertyName] || []).map(
@@ -89,10 +92,12 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 					label={label}
 					id={propertyName as string}
 					options={checkboxMultiOptions}
+					showMaxOptions={40}
 					disabled={disabled}
 					onChange={async (values: string[]) => {
 						await handleFilterFieldChange(values, propertyName);
 					}}
+					onSearch={onSearch}
 				/>
 			</li>
 		);
@@ -125,8 +130,12 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 		);
 	};
 
-	return (
-		<ul className="c-filter-dropdown-list">
+	const renderFilters = () => (
+		<ul
+			className={classnames('c-filter-dropdown-list', {
+				'c-filter-dropdown-list--mobile': isMobileWidth(),
+			})}
+		>
 			{renderCheckboxDropdownModal(
 				t('search/components/search-filter-controls___type'),
 				'type'
@@ -171,6 +180,21 @@ const SearchFilterControls: FunctionComponent<SearchFilterControlsProps> = ({
 			)}
 		</ul>
 	);
+
+	if (isMobileWidth()) {
+		return (
+			<Spacer margin="bottom-large">
+				<Accordion
+					title={t('search/components/search-filter-controls___filters')}
+					className="c-accordion--filters"
+				>
+					<AccordionBody>{renderFilters()}</AccordionBody>
+				</Accordion>
+			</Spacer>
+		);
+	}
+
+	return renderFilters();
 };
 
 export default SearchFilterControls;

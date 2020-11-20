@@ -2,8 +2,9 @@ import { get, isNil } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
-import { Button, ButtonToolbar, Container, Spacer } from '@viaa/avo2-components';
+import { Button, ButtonToolbar, Spacer } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
@@ -15,8 +16,9 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
-import { CustomError, formatDate, navigate } from '../../../shared/helpers';
+import { buildLink, CustomError, formatDate, navigate } from '../../../shared/helpers';
 import { ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import FilterTable from '../../shared/components/FilterTable/FilterTable';
 import { getDateRangeFilters, getQueryFilter } from '../../shared/helpers/filters';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
@@ -46,14 +48,16 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 	const [interactiveTourCount, setInteractiveTourCount] = useState<number>(0);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [tableState, setTableState] = useState<Partial<InteractiveTourTableState>>({});
+	const [isLoading, setIsLoading] = useState<boolean>(false);
 
 	const fetchInteractiveTours = useCallback(async () => {
+		setIsLoading(true);
 		const generateWhereObject = (filters: Partial<InteractiveTourTableState>) => {
 			const andFilters: any[] = [];
 			andFilters.push(
-				...getQueryFilter(filters.query, (queryWordWildcard: string) => [
-					{ name: { _ilike: queryWordWildcard } },
-					{ page: { _ilike: queryWordWildcard } },
+				...getQueryFilter(filters.query, (queryWildcard: string) => [
+					{ name: { _ilike: queryWildcard } },
+					{ page: { _ilike: queryWildcard } },
 				])
 			);
 			andFilters.push(...getDateRangeFilters(filters, ['created_at', 'updated_at']));
@@ -86,6 +90,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 				),
 			});
 		}
+		setIsLoading(false);
 	}, [setInteractiveTours, setLoadingInfo, t, tableState]);
 
 	useEffect(() => {
@@ -104,8 +109,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 				ToastService.danger(
 					t(
 						'admin/interactive-tour/views/interactive-tour-overview___het-verwijderen-van-de-interactieve-tour-is-mislukt-probeer-de-pagina-te-herladen'
-					),
-					false
+					)
 				);
 				return;
 			}
@@ -115,8 +119,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 			ToastService.success(
 				t(
 					'admin/interactive-tour/views/interactive-tour-overview___de-interactieve-tour-is-verwijdert'
-				),
-				false
+				)
 			);
 		} catch (err) {
 			console.error(
@@ -128,8 +131,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 			ToastService.danger(
 				t(
 					'admin/interactive-tour/views/interactive-tour-overview___het-verwijderen-van-de-interactieve-tour-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
@@ -139,8 +141,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 			ToastService.danger(
 				t(
 					'admin/interactive-tour/views/interactive-tour-overview___de-interactieve-tour-kon-niet-worden-verwijdert-probeer-de-pagina-te-herladen'
-				),
-				false
+				)
 			);
 			return;
 		}
@@ -153,6 +154,13 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 		columnId: InteractiveTourOverviewTableCols
 	) => {
 		switch (columnId) {
+			case 'name':
+				return (
+					<Link to={buildLink(ADMIN_PATH.INTERACTIVE_TOUR_DETAIL, { id: rowData.id })}>
+						{isNil(rowData.name) ? '-' : rowData.name}
+					</Link>
+				);
+
 			case 'page_id':
 				return (
 					<div>
@@ -269,6 +277,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 					noContentMatchingFiltersMessage={t(
 						'admin/interactive-tour/views/interactive-tour-overview___er-zijn-geen-interactieve-tours-die-voldoen-aan-de-filters'
 					)}
+					isLoading={isLoading}
 				/>
 				<DeleteObjectModal
 					deleteObjectCallback={handleDelete}
@@ -284,6 +293,7 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 			pageTitle={t(
 				'admin/interactive-tour/views/interactive-tour-overview___interactieve-tours'
 			)}
+			size="full-width"
 		>
 			<AdminLayoutTopBarRight>
 				<Button
@@ -314,15 +324,11 @@ const InteractiveTourGroupOverview: FunctionComponent<InteractiveTourOverviewPro
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<LoadingErrorLoadedComponent
-							loadingInfo={loadingInfo}
-							dataObject={interactiveTours}
-							render={renderInteractiveTourPageBody}
-						/>
-					</Container>
-				</Container>
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={interactiveTours}
+					render={renderInteractiveTourPageBody}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

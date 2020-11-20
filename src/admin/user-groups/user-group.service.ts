@@ -11,7 +11,7 @@ import {
 	ADD_PERMISSION_GROUPS_TO_USER_GROUP,
 	DELETE_USER_GROUP,
 	GET_USER_GROUP_BY_ID,
-	GET_USER_GROUPS,
+	GET_USER_GROUPS_WITH_FILTERS,
 	INSERT_USER_GROUP,
 	REMOVE_PERMISSION_GROUPS_FROM_USER_GROUP,
 	UPDATE_USER_GROUP,
@@ -35,7 +35,7 @@ export class UserGroupService {
 			};
 			const response = await dataService.query({
 				variables,
-				query: GET_USER_GROUPS,
+				query: GET_USER_GROUPS_WITH_FILTERS,
 			});
 			const userGroups = get(response, 'data.users_groups');
 			const userGroupCount = get(response, 'data.users_groups_aggregate.aggregate.count');
@@ -52,9 +52,14 @@ export class UserGroupService {
 		} catch (err) {
 			throw new CustomError('Failed to fetch user groups from graphql', err, {
 				variables,
-				query: 'GET_USER_GROUPS',
+				query: 'GET_USER_GROUPS_WITH_FILTERS',
 			});
 		}
+	}
+
+	public static async fetchAllUserGroups(): Promise<UserGroup[]> {
+		const response = await UserGroupService.fetchUserGroups(0, 'label', 'asc', {});
+		return response[0];
 	}
 
 	public static async fetchUserGroupById(id: string): Promise<UserGroup | undefined> {
@@ -89,7 +94,7 @@ export class UserGroupService {
 			const response = await dataService.mutate({
 				mutation: ADD_PERMISSION_GROUPS_TO_USER_GROUP,
 				variables: {
-					objs: permissionGroupIds.map(permissionGroupId => ({
+					objs: permissionGroupIds.map((permissionGroupId) => ({
 						user_permission_group_id: permissionGroupId,
 						user_group_id: userGroupId,
 					})),
@@ -233,7 +238,7 @@ export class UserGroupService {
 	): Permission[] {
 		return uniqBy(
 			orderBy(permissionGroups, [sortColumn], [sortOrder]),
-			permissionGroup => permissionGroup.id
+			(permissionGroup) => permissionGroup.id
 		);
 	}
 

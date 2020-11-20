@@ -1,7 +1,9 @@
-import { get } from 'lodash-es';
+import classnames from 'classnames';
+import { get, isNil } from 'lodash-es';
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
 import {
 	BlockHeading,
@@ -35,7 +37,6 @@ import { ItemsService } from '../../admin/items/items.service';
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
 import { getProfileName } from '../../authentication/helpers/get-profile-info';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
-import { redirectToClientPage } from '../../authentication/helpers/redirects';
 import {
 	ContentTypeNumber,
 	ContentTypeString,
@@ -56,8 +57,10 @@ import {
 	generateSearchLink,
 	generateSearchLinks,
 	generateSearchLinkString,
+	isMobileWidth,
 	reorderDate,
 } from '../../shared/helpers';
+import { generateRelatedItemLink } from '../../shared/helpers/handle-related-item-click';
 import { BookmarksViewsPlaysService, ToastService } from '../../shared/services';
 import { DEFAULT_BOOKMARK_VIEW_PLAY_COUNTS } from '../../shared/services/bookmarks-views-plays-service';
 import { BookmarkViewPlayCounts } from '../../shared/services/bookmarks-views-plays-service/bookmarks-views-plays-service.types';
@@ -99,7 +102,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 		const retrieveRelatedItems = (currentItemId: string, limit: number) => {
 			getRelatedItems(currentItemId, 'items', limit)
 				.then(setRelatedItems)
-				.catch(err => {
+				.catch((err) => {
 					console.error('Failed to get related items', err, {
 						currentItemId,
 						limit,
@@ -113,17 +116,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 
 		const checkPermissionsAndGetItem = async () => {
 			try {
-				const hasPermission: boolean = await PermissionService.hasPermissions(
-					[
-						PermissionName.VIEW_ANY_PUBLISHED_ITEMS,
-						{
-							name: PermissionName.VIEW_ITEMS_LINKED_TO_ASSIGNMENT,
-							obj: match.params.id,
-						},
-					],
-					user
-				);
-				if (!hasPermission) {
+				if (!PermissionService.hasPerm(user, PermissionName.VIEW_ANY_PUBLISHED_ITEMS)) {
 					setLoadingInfo({
 						state: 'error',
 						message: t(
@@ -134,9 +127,9 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 					return;
 				}
 
-				const itemObj: Avo.Item.Item | null = await ItemsService.fetchItemByExternalId(
-					match.params.id
-				);
+				const itemObj:
+					| (Avo.Item.Item & { replacement_for?: string })
+					| null = await ItemsService.fetchItemByExternalId(match.params.id);
 				if (!itemObj) {
 					setLoadingInfo({
 						state: 'error',
@@ -146,10 +139,31 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 					return;
 				}
 
+				if (itemObj.depublish_reason) {
+					setLoadingInfo({
+						state: 'error',
+						message:
+							t(
+								'item/views/item-detail___dit-item-werdt-gedepubliceerd-met-volgende-reden'
+							) + itemObj.depublish_reason,
+						icon: 'camera-off',
+					});
+					return;
+				}
+
+				if (itemObj.replacement_for) {
+					// Item was replaced by another item
+					// We should reload the page, to update the url
+					history.replace(
+						buildLink(APP_PATH.ITEM_DETAIL.route, { id: itemObj.external_id })
+					);
+					return;
+				}
+
 				trackEvents(
 					{
 						object: match.params.id,
-						object_type: 'avo_item_pid',
+						object_type: 'item',
 						message: `Gebruiker ${getProfileName(user)} heeft de pagina van fragment ${
 							match.params.id
 						} bezocht`,
@@ -196,7 +210,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 		};
 
 		checkPermissionsAndGetItem();
-	}, [match.params.id, setItem, t, user]);
+	}, [match.params.id, setItem, t, history, user]); // ensure only triggers once for user object
 
 	const toggleBookmark = async () => {
 		try {
@@ -211,6 +225,11 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 				...bookmarkViewPlayCounts,
 				isBookmarked: !bookmarkViewPlayCounts.isBookmarked,
 			});
+			ToastService.success(
+				bookmarkViewPlayCounts.isBookmarked
+					? t('collection/views/collection-detail___de-bladwijzer-is-verwijderd')
+					: t('collection/views/collection-detail___de-bladwijzer-is-aangemaakt')
+			);
 		} catch (err) {
 			console.error(
 				new CustomError('Failed to toggle bookmark', err, {
@@ -228,45 +247,54 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 		}
 	};
 
-	const handleRelatedItemClicked = (relatedItem: Avo.Search.ResultItem) => {
-		redirectToClientPage(
-			buildLink(APP_PATH.ITEM_DETAIL.route, { id: relatedItem.id }),
-			history
-		);
-		window.scrollTo({ top: 0, behavior: 'smooth' });
-	};
-
 	const goToSearchPage = (prop: Avo.Search.FilterProp, value: string) => {
 		history.push(generateSearchLinkString(prop, value));
 	};
 
+	const trackOnPlay = () => {
+		trackEvents(
+			{
+				object: get(item, 'external_id', ''),
+				object_type: 'item',
+				message: `${getProfileName(user)} heeft een item afgespeeld`,
+				action: 'play',
+			},
+			user
+		);
+	};
+
 	const renderRelatedItems = () => {
 		if (relatedItems && relatedItems.length) {
-			return relatedItems.map(relatedItem => {
+			return relatedItems.map((relatedItem) => {
 				const englishContentType: EnglishContentType =
 					toEnglishContentType(relatedItem.administrative_type) ||
 					ContentTypeString.video;
 
 				return (
 					<li key={`related-item-${relatedItem.id}`}>
-						<MediaCard
-							category={englishContentType}
-							onClick={() => handleRelatedItemClicked(relatedItem)}
-							orientation="horizontal"
-							title={relatedItem.dc_title}
+						<Link
+							to={generateRelatedItemLink(relatedItem)}
+							className="a-link__no-styles"
 						>
-							<MediaCardThumbnail>
-								<Thumbnail
-									category={englishContentType}
-									src={relatedItem.thumbnail_path}
-								/>
-							</MediaCardThumbnail>
-							<MediaCardMetaData>
-								<MetaData category={englishContentType}>
-									<MetaDataItem label={relatedItem.original_cp || ''} />
-								</MetaData>
-							</MediaCardMetaData>
-						</MediaCard>
+							<MediaCard
+								category={englishContentType}
+								orientation="horizontal"
+								title={relatedItem.dc_title}
+							>
+								<MediaCardThumbnail>
+									<Thumbnail
+										category={englishContentType}
+										src={relatedItem.thumbnail_path}
+										showCategoryIcon
+									/>
+								</MediaCardThumbnail>
+								<MediaCardMetaData>
+									<MetaData category={englishContentType}>
+										<MetaDataItem label={relatedItem.original_cp || ''} />
+									</MetaData>
+								</MediaCardMetaData>
+							</MediaCard>
+						</Link>
 					</li>
 				);
 			});
@@ -287,7 +315,9 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 					title={item.title}
 					category={toEnglishContentType(item.type.label)}
 					showMetaData={true}
-					className="c-item-detail__header"
+					className={classnames('c-item-detail__header', {
+						'c-item-detail__header-mobile': isMobileWidth(),
+					})}
 				>
 					<HeaderContentType
 						category={toEnglishContentType(item.type.label)}
@@ -333,14 +363,17 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 							{!!item.issued && (
 								<MetaDataItem>
 									<p className="c-body-2 u-text-muted">
-										Gepubliceerd op {reorderDate(item.issued || null, '/')}
+										{`${t(
+											'item/views/item-detail___uitgezonden-op'
+										)} ${reorderDate(item.issued || null, '/')}`}
 									</p>
 								</MetaDataItem>
 							)}
 							{!!item.series && (
 								<MetaDataItem>
 									<p className="c-body-2 u-text-muted">
-										Uit reeks: {generateSearchLink('serie', item.series)}
+										<span>{`${t('item/views/item-detail___reeks')} `}</span>
+										{generateSearchLink('serie', item.series)}
 									</p>
 								</MetaDataItem>
 							)}
@@ -356,6 +389,8 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 								!isShareThroughEmailModalOpen &&
 								!isReportItemModalOpen
 							}
+							onPlay={trackOnPlay}
+							verticalLayout={isMobileWidth()}
 						/>
 						<Grid>
 							<Column size="2-7">
@@ -366,7 +401,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 												<Flex justify="between" wrap>
 													<Button
 														type="tertiary"
-														icon="add"
+														icon="scissors"
 														label={t(
 															'item/views/item___voeg-fragment-toe-aan-collectie'
 														)}
@@ -449,7 +484,13 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 									<BlockHeading type="h3">
 										<Trans i18nKey="item/views/item___metadata">Metadata</Trans>
 									</BlockHeading>
-									<Table horizontal untable>
+									<Table
+										horizontal
+										untable
+										className={classnames('c-meta-data__table', {
+											'c-meta-data__table-mobile': isMobileWidth(),
+										})}
+									>
 										<Grid tag="tbody">
 											{!!item.issued && (
 												<Column size="2-5" tag="tr">
@@ -522,7 +563,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 													<td>
 														{item.lom_languages
 															.map(
-																languageCode =>
+																(languageCode) =>
 																	LANGUAGES.nl[languageCode]
 															)
 															.join(', ')}
@@ -532,7 +573,13 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 										</Grid>
 									</Table>
 									<div className="c-hr" />
-									<Table horizontal untable>
+									<Table
+										horizontal
+										untable
+										className={classnames('c-meta-data__table', {
+											'c-meta-data__table-mobile': isMobileWidth(),
+										})}
+									>
 										<tbody>
 											{!!item.external_id && !!item.lom_context && (
 												<tr>
@@ -569,7 +616,13 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 										</tbody>
 									</Table>
 									<div className="c-hr" />
-									<Table horizontal untable>
+									<Table
+										horizontal
+										untable
+										className={classnames('c-meta-data__table', {
+											'c-meta-data__table-mobile': isMobileWidth(),
+										})}
+									>
 										<tbody>
 											{!!item.lom_keywords && !!item.lom_keywords.length && (
 												<tr>
@@ -581,7 +634,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 													<td>
 														<TagList
 															tags={item.lom_keywords.map(
-																keyword => ({
+																(keyword) => ({
 																	label: keyword,
 																	id: keyword,
 																})
@@ -624,7 +677,7 @@ const ItemDetail: FunctionComponent<ItemDetailProps> = ({ history, match, locati
 						</Grid>
 					</Container>
 				</Container>
-				{typeof match.params.id !== undefined && isOpenAddToCollectionModal && (
+				{!isNil(match.params.id) && isOpenAddToCollectionModal && (
 					<AddToCollectionModal
 						history={history}
 						location={location}

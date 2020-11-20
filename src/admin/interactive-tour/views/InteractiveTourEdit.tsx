@@ -1,4 +1,4 @@
-import { cloneDeep, compact, get, isEmpty, isEqual, map, orderBy } from 'lodash-es';
+import { cloneDeep, compact, get, isEmpty, map, orderBy } from 'lodash-es';
 import React, {
 	FunctionComponent,
 	Reducer,
@@ -20,22 +20,10 @@ import {
 	FlexItem,
 	Form,
 	FormGroup,
-	Icon,
-	IconName,
-	Panel,
-	PanelBody,
-	PanelHeader,
 	Select,
 	SelectOption,
 	Spacer,
 	TextInput,
-	Toolbar,
-	ToolbarItem,
-	ToolbarLeft,
-	ToolbarRight,
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
@@ -43,11 +31,10 @@ import { DefaultSecureRouteProps } from '../../../authentication/components/Secu
 import { redirectToClientPage } from '../../../authentication/helpers/redirects';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../../constants';
 import { LoadingErrorLoadedComponent, LoadingInfo } from '../../../shared/components';
-import Html from '../../../shared/components/Html/Html';
-import WYSIWYGWrapper from '../../../shared/components/WYSIWYGWrapper/WYSIWYGWrapper';
-import { ROUTE_PARTS, WYSIWYG_OPTIONS_FULL } from '../../../shared/constants';
-import { buildLink, CustomError, navigate, sanitizeHtml, stripHtml } from '../../../shared/helpers';
+import { ROUTE_PARTS } from '../../../shared/constants';
+import { buildLink, CustomError, navigate, sanitizeHtml } from '../../../shared/helpers';
 import { dataService, ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import { ContentPicker } from '../../shared/components/ContentPicker/ContentPicker';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import { PickerItem } from '../../shared/types';
@@ -75,6 +62,7 @@ import {
 } from '../interactive-tour.types';
 
 import './InteractiveTourEdit.scss';
+import InteractiveTourEditStep from './InteractiveTourEditStep';
 
 export interface InteractiveTourEditProps extends DefaultSecureRouteProps<{ id: string }> {}
 
@@ -120,7 +108,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 
 	const getPageType = useCallback(
 		(pageId: string): InteractiveTourPageType => {
-			const staticPageIds = getPageOptions().map(pageOption => pageOption.value);
+			const staticPageIds = getPageOptions().map((pageOption) => pageOption.value);
 			return staticPageIds.includes(pageId) ? 'static' : 'content';
 		},
 		[getPageOptions]
@@ -259,8 +247,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 			setFormErrors(errors || {});
 			if (errors) {
 				ToastService.danger(
-					t('admin/interactive-tour/views/interactive-tour-edit___de-invoer-is-ongeldig'),
-					false
+					t('admin/interactive-tour/views/interactive-tour-edit___de-invoer-is-ongeldig')
 				);
 				return;
 			}
@@ -272,8 +259,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 				ToastService.danger(
 					t(
 						'admin/interactive-tour/views/interactive-tour-edit___het-opslaan-van-de-interactive-tour-is-mislukt-omdat-de-interactive-tour-nog-niet-is-geladen'
-					),
-					false
+					)
 				);
 				return;
 			}
@@ -293,21 +279,16 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 				interactiveTourId = match.params.id;
 			}
 
-			if (isCreatePage) {
-				redirectToClientPage(
-					buildLink(INTERACTIVE_TOUR_PATH.INTERACTIVE_TOUR_EDIT, {
-						id: interactiveTourId,
-					}),
-					history
-				);
-			} else {
-				await initOrFetchInteractiveTour();
-			}
+			redirectToClientPage(
+				buildLink(INTERACTIVE_TOUR_PATH.INTERACTIVE_TOUR_DETAIL, {
+					id: interactiveTourId,
+				}),
+				history
+			);
 			ToastService.success(
 				t(
 					'admin/interactive-tour/views/interactive-tour-edit___de-interactive-tour-is-opgeslagen'
-				),
-				false
+				)
 			);
 		} catch (err) {
 			console.error(
@@ -319,8 +300,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 			ToastService.danger(
 				t(
 					'admin/interactive-tour/views/interactive-tour-edit___het-opslaan-van-de-interactive-tour-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 		setIsSaving(false);
@@ -356,183 +336,22 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 		return undefined;
 	};
 
-	const renderReorderButton = (index: number, direction: 'up' | 'down', disabled: boolean) => (
-		<Button
-			type="secondary"
-			icon={`chevron-${direction}` as IconName}
-			title={
-				direction === 'up'
-					? t('admin/interactive-tour/views/interactive-tour-edit___verplaats-naar-boven')
-					: t('admin/interactive-tour/views/interactive-tour-edit___verplaats-naar-onder')
-			}
-			ariaLabel={
-				direction === 'up'
-					? t('admin/interactive-tour/views/interactive-tour-edit___verplaats-naar-boven')
-					: t('admin/interactive-tour/views/interactive-tour-edit___verplaats-naar-onder')
-			}
-			onClick={() => {
-				changeInteractiveTourState({
-					direction,
-					index,
-					type: InteractiveTourEditActionType.SWAP_STEPS,
-				});
-			}}
-			disabled={disabled}
-		/>
-	);
-
 	const renderStep = (step: EditableStep, index: number) => {
 		if (!interactiveTourState.currentInteractiveTour) {
 			return null;
 		}
 
 		return (
-			<div key={`step_${step.id}`}>
-				<Panel>
-					<PanelHeader>
-						<Toolbar>
-							<ToolbarLeft>
-								<ToolbarItem>
-									<div className="c-button-toolbar">
-										{renderReorderButton(index, 'up', index === 0)}
-										{renderReorderButton(
-											index,
-											'down',
-											index ===
-												(
-													interactiveTourState.currentInteractiveTour
-														.steps || []
-												).length -
-													1
-										)}
-									</div>
-								</ToolbarItem>
-							</ToolbarLeft>
-							<ToolbarRight>
-								<ToolbarItem>
-									<Button
-										icon="trash-2"
-										type="danger"
-										onClick={() => {
-											changeInteractiveTourState({
-												index,
-												type: InteractiveTourEditActionType.REMOVE_STEP,
-											});
-										}}
-										ariaLabel={t(
-											'admin/interactive-tour/views/interactive-tour-edit___verwijder-stap'
-										)}
-										title={t(
-											'admin/interactive-tour/views/interactive-tour-edit___verwijder-stap'
-										)}
-									/>
-								</ToolbarItem>
-							</ToolbarRight>
-						</Toolbar>
-					</PanelHeader>
-					<PanelBody>
-						<Form>
-							<FormGroup
-								label={t(
-									'admin/interactive-tour/views/interactive-tour-edit___titel'
-								)}
-								error={get(formErrors, `steps[${index}].title`)}
-							>
-								<TextInput
-									value={(step.title || '').toString()}
-									onChange={newTitle => {
-										changeInteractiveTourState({
-											type: InteractiveTourEditActionType.UPDATE_STEP_PROP,
-											stepIndex: index,
-											stepProp: 'title',
-											stepPropValue: newTitle,
-										});
-									}}
-								/>
-								<Spacer margin="top-small">{step.title.length} / 28</Spacer>
-							</FormGroup>
-							<FormGroup
-								label={t(
-									'admin/interactive-tour/views/interactive-tour-edit___tekst'
-								)}
-								error={get(formErrors, `steps[${index}].content`)}
-							>
-								<WYSIWYGWrapper
-									initialHtml={(step.content || '').toString()}
-									state={step.contentState}
-									onChange={newContentState => {
-										if (!isEqual(newContentState, step.contentState)) {
-											changeInteractiveTourState({
-												type:
-													InteractiveTourEditActionType.UPDATE_STEP_PROP,
-												stepIndex: index,
-												stepProp: 'contentState',
-												stepPropValue: newContentState,
-											});
-										}
-									}}
-									controls={WYSIWYG_OPTIONS_FULL}
-									fileType="INTERACTIVE_TOUR_IMAGE"
-									id={`content_editor_${index}`}
-									placeholder={t(
-										'admin/interactive-tour/views/interactive-tour-edit___vul-een-stap-tekst-in'
-									)}
-								/>
-								<Spacer margin="top-small">
-									{
-										(step.contentState
-											? stripHtml(
-													sanitizeHtml(step.contentState.toHTML(), 'link')
-											  )
-											: step.content || ''
-										).length
-									}{' '}
-									/ 200
-								</Spacer>
-							</FormGroup>
-
-							<FormGroup
-								label={t(
-									'admin/interactive-tour/views/interactive-tour-edit___element-css-selector'
-								)}
-							>
-								<TextInput
-									value={(step.target || '').toString()}
-									onChange={newTarget => {
-										changeInteractiveTourState({
-											type: InteractiveTourEditActionType.UPDATE_STEP_PROP,
-											stepIndex: index,
-											stepProp: 'target',
-											stepPropValue: newTarget,
-										});
-									}}
-									className="c-text-input__selector"
-								/>
-								<Tooltip position="top">
-									<TooltipTrigger>
-										<span>
-											<Icon
-												className="a-info-icon"
-												name="info"
-												size="small"
-											/>
-										</span>
-									</TooltipTrigger>
-									<TooltipContent>
-										<Spacer padding="small">
-											<Html
-												content={t(
-													'admin/interactive-tour/views/interactive-tour-edit___hoe-kopieer-je-een-css-selector'
-												)}
-												type="div"
-											/>
-										</Spacer>
-									</TooltipContent>
-								</Tooltip>
-							</FormGroup>
-						</Form>
-					</PanelBody>
-				</Panel>
+			<div key={`step_${step.target}_${step.id}`}>
+				<InteractiveTourEditStep
+					step={step}
+					index={index}
+					changeInteractiveTourState={changeInteractiveTourState}
+					numberOfSteps={
+						get(interactiveTourState, 'currentInteractiveTour.steps.length') || 1
+					}
+					stepErrors={get(formErrors, ['steps', index])}
+				/>
 				<InteractiveTourAdd
 					index={index + 1}
 					interactiveTour={interactiveTourState.currentInteractiveTour}
@@ -563,7 +382,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 										value={
 											interactiveTourState.currentInteractiveTour.name || ''
 										}
-										onChange={newName =>
+										onChange={(newName) =>
 											changeInteractiveTourState({
 												type:
 													InteractiveTourEditActionType.UPDATE_INTERACTIVE_TOUR_PROP,
@@ -598,7 +417,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 													},
 												]}
 												value={selectedPageType}
-												onChange={value =>
+												onChange={(value) =>
 													setSelectedPageType(
 														value as InteractiveTourPageType
 													)
@@ -650,10 +469,11 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 	// Render
 	const renderPage = () => (
 		<AdminLayout
-			showBackButton
+			onClickBackButton={() => navigate(history, ADMIN_PATH.INTERACTIVE_TOUR_OVERVIEW)}
 			pageTitle={t(
 				'admin/interactive-tour/views/interactive-tour-edit___interactive-tour-aanpassen'
 			)}
+			size="large"
 		>
 			<AdminLayoutTopBarRight>
 				<ButtonToolbar>
@@ -669,11 +489,7 @@ const InteractiveTourEdit: FunctionComponent<InteractiveTourEditProps> = ({
 					/>
 				</ButtonToolbar>
 			</AdminLayoutTopBarRight>
-			<AdminLayoutBody>
-				<Container mode="vertical" size="small" className="m-interactive-tour-edit-view">
-					<Container mode="horizontal">{renderEditPage()}</Container>
-				</Container>
-			</AdminLayoutBody>
+			<AdminLayoutBody>{renderEditPage()}</AdminLayoutBody>
 		</AdminLayout>
 	);
 

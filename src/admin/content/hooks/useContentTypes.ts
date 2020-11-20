@@ -17,7 +17,7 @@ export const useContentTypes = (): UseContentTypesTuple => {
 		setIsLoading(true);
 
 		ContentService.getContentTypes()
-			.then(types => {
+			.then((types) => {
 				if (types) {
 					setContentTypeOptions(types);
 				}

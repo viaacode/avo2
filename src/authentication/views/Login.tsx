@@ -8,11 +8,12 @@ import { Dispatch } from 'redux';
 import { Button, Flex, Spacer, Spinner } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-import { UserService } from '../../admin/users/user.service';
+import { SpecialUserGroup } from '../../admin/user-groups/user-group.const';
 import { APP_PATH } from '../../constants';
 import { ErrorView } from '../../error/views';
 import { AppState } from '../../store';
 import { LoginMessage } from '../authentication.types';
+import { getUserGroupId } from '../helpers/get-profile-info';
 import { redirectToServerLoginPage } from '../helpers/redirects';
 import { getLoginStateAction } from '../store/actions';
 import { selectLogin, selectLoginError, selectLoginLoading } from '../store/selectors';
@@ -42,11 +43,13 @@ const Login: FunctionComponent<LoginProps> = ({
 			return;
 		}
 
-		// Redirect to previous requested path or the default page for that role (LOGGED_IN_HOME or WORKSPACE_ASSIGNMENTS)
+		// Redirect to previous requested path or the default page for that user group (LOGGED_IN_HOME or WORKSPACE_ASSIGNMENTS)
 		if (loginState && loginState.message === LoginMessage.LOGGED_IN && !loginStateLoading) {
 			let path = get(location, 'state.from.pathname');
 			if (!path) {
-				if (UserService.getUserRole(get(loginState, 'userInfo')) === 'leerling') {
+				if (
+					getUserGroupId(get(loginState, 'userInfo.profile')) === SpecialUserGroup.Pupil
+				) {
 					path = APP_PATH.WORKSPACE_ASSIGNMENTS.route;
 				} else {
 					path = APP_PATH.LOGGED_IN_HOME.route;
@@ -67,7 +70,9 @@ const Login: FunctionComponent<LoginProps> = ({
 	}, [getLoginState, loginState, loginStateLoading, loginStateError, history, location]);
 
 	const tryLoginAgainManually = () => {
-		localStorage.removeItem(LOGIN_ATTEMPT_KEY);
+		if (localStorage) {
+			localStorage.removeItem(LOGIN_ATTEMPT_KEY);
+		}
 		getLoginState();
 	};
 

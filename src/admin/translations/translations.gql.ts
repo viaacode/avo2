@@ -1,7 +1,7 @@
 import { gql } from 'apollo-boost';
 
 export const GET_TRANSLATIONS = gql`
-	{
+	query getTranslations {
 		app_site_variables(where: { name: { _ilike: "translations-%" } }) {
 			name
 			value

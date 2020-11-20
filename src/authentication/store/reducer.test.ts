@@ -27,9 +27,7 @@ describe('login > store > reducer', () => {
 			message: LoginMessage.LOGGED_IN,
 			userInfo: {} as any,
 			acceptedConditions: true,
-			sessionExpiresAt: moment()
-				.add(1, 'days')
-				.toString(),
+			sessionExpiresAt: moment().add(1, 'days').toString(),
 		};
 
 		const state = loginReducer(initialState, setLoginSuccess(payload));

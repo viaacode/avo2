@@ -9,7 +9,7 @@ import {
 	DefaultContentBlockState,
 	ImageGridBlockComponentStateFields,
 } from '../../../shared/types';
-import { BlockGridWrapperProps } from '../../components/wrappers/ImageGridWrapper/ImageGridWrapper';
+import { BlockImageGridWrapperProps } from '../../components/wrappers/ImageGridWrapper/ImageGridWrapper';
 import {
 	GET_ALIGN_OPTIONS,
 	GET_BUTTON_TYPE_OPTIONS,
@@ -31,7 +31,7 @@ export const INITIAL_IMAGE_GRID_COMPONENTS_STATE = (): ImageGridBlockComponentSt
 	} as any,
 ];
 
-export const INITIAL_IMAGE_GRID_BLOCK_STATE = (): BlockGridWrapperProps &
+export const INITIAL_IMAGE_GRID_BLOCK_STATE = (): BlockImageGridWrapperProps &
 	DefaultContentBlockState => {
 	return {
 		...BLOCK_STATE_DEFAULTS({
@@ -64,6 +64,7 @@ export const IMAGE_GRID_BLOCK_CONFIG = (position: number = 0): ContentBlockConfi
 					editorProps: {
 						assetType: 'CONTENT_BLOCK_IMAGE',
 						allowMulti: false,
+						showDeleteButton: false,
 					} as FileUploadProps,
 				}
 			),
@@ -118,6 +119,13 @@ export const IMAGE_GRID_BLOCK_CONFIG = (position: number = 0): ContentBlockConfi
 				editorType: ContentBlockEditor.Select,
 				editorProps: {
 					options: GET_FILL_OPTIONS(),
+				},
+			},
+			align: {
+				label: i18n.t('admin/content-block/helpers/generators/image-grid___alignatie'),
+				editorType: ContentBlockEditor.Select,
+				editorProps: {
+					options: GET_ALIGN_OPTIONS(),
 				},
 			},
 			textAlign: {

@@ -1,4 +1,4 @@
-import { get } from 'lodash-es';
+import { compact, get } from 'lodash-es';
 import React, { FunctionComponent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
@@ -7,14 +7,18 @@ import { Link } from 'react-router-dom';
 import {
 	Button,
 	ButtonToolbar,
-	Container,
+	LabelObj,
 	LinkTarget,
 	Modal,
 	ModalBody,
 	Spacer,
+	TagList,
+	TagOption,
 } from '@viaa/avo2-components';
 
+import { SpecialPermissionGroups } from '../../../authentication/authentication.types';
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
+import { getUserGroupLabel } from '../../../authentication/helpers/get-profile-info';
 import {
 	PermissionName,
 	PermissionService,
@@ -35,13 +39,11 @@ import {
 	navigate,
 	navigateToAbsoluteOrRelativeUrl,
 } from '../../../shared/helpers';
+import { setSelectedCheckboxes } from '../../../shared/helpers/set-selected-checkboxes';
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { ToastService } from '../../../shared/services';
-import i18n from '../../../shared/translations/i18n';
-import FilterTable, {
-	FilterableColumn,
-	getFilters,
-} from '../../shared/components/FilterTable/FilterTable';
+import { useContentPageLabelOptions } from '../../content-page-labels/hooks/useContentPageLabelOptions';
+import FilterTable, { getFilters } from '../../shared/components/FilterTable/FilterTable';
 import {
 	getBooleanFilters,
 	getDateRangeFilters,
@@ -49,8 +51,9 @@ import {
 	getQueryFilter,
 } from '../../shared/helpers/filters';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
-import { UserService } from '../../users/user.service';
-import { CONTENT_PATH, ITEMS_PER_PAGE } from '../content.const';
+import { useUserGroups } from '../../user-groups/hooks';
+import { useUserGroupOptions } from '../../user-groups/hooks/useUserGroupOptions';
+import { CONTENT_PATH, GET_CONTENT_PAGE_OVERVIEW_COLUMNS, ITEMS_PER_PAGE } from '../content.const';
 import { ContentService } from '../content.service';
 import { ContentOverviewTableCols, ContentPageInfo, ContentTableState } from '../content.types';
 import { isPublic } from '../helpers/get-published-state';
@@ -59,6 +62,13 @@ import { useContentTypes } from '../hooks';
 import './ContentOverview.scss';
 
 interface ContentOverviewProps extends DefaultSecureRouteProps {}
+
+const {
+	EDIT_ANY_CONTENT_PAGES,
+	DELETE_ANY_CONTENT_PAGES,
+	EDIT_PROTECTED_PAGE_STATUS,
+	CREATE_CONTENT_PAGES,
+} = PermissionName;
 
 const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, user }) => {
 	// Hooks
@@ -70,36 +80,55 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 	const [isNotAdminModalOpen, setIsNotAdminModalOpen] = useState<boolean>(false);
 	const [tableState, setTableState] = useState<Partial<ContentTableState>>({});
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
-
+	const [isLoading, setIsLoading] = useState<boolean>(false);
+	const [userGroupOptions] = useUserGroupOptions('CheckboxOption', false) as [
+		CheckboxOption[],
+		boolean
+	];
+	const [userGroups] = useUserGroups(true);
 	const [contentTypes] = useContentTypes();
+	const [contentPageLabelOptions] = useContentPageLabelOptions();
 
 	const [t] = useTranslation();
 
+	const hasPerm = useCallback(
+		(permission: PermissionName) => PermissionService.hasPerm(user, permission),
+		[user]
+	);
+
 	const fetchContentPages = useCallback(async () => {
 		try {
+			setIsLoading(true);
 			const generateWhereObject = (filters: Partial<ContentTableState>) => {
 				const andFilters: any[] = [];
 				andFilters.push(
 					...getQueryFilter(
 						filters.query,
 						// @ts-ignore
-						(queryWordWildcard: string) => [
-							{ title: { _ilike: queryWordWildcard } },
-							{ path: { _ilike: queryWordWildcard } },
+						(queryWildcard: string) => [
+							{ title: { _ilike: queryWildcard } },
+							{ title: { _ilike: queryWildcard } },
+							{ path: { _ilike: queryWildcard } },
 							{
 								profile: {
-									usersByuserId: { first_name: { _ilike: queryWordWildcard } },
+									_or: [
+										{
+											usersByuserId: {
+												first_name: { _ilike: queryWildcard },
+											},
+										},
+										{
+											usersByuserId: {
+												last_name: { _ilike: queryWildcard },
+											},
+										},
+									],
 								},
 							},
 							{
 								profile: {
-									usersByuserId: { last_name: { _ilike: queryWordWildcard } },
-								},
-							},
-							{
-								profile: {
-									usersByuserId: {
-										role: { label: { _ilike: queryWordWildcard } },
+									profile_user_groups: {
+										groups: { label: { _ilike: queryWildcard } },
 									},
 								},
 							},
@@ -107,7 +136,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 								content_content_labels: {
 									content_label: {
 										label: {
-											_ilike: queryWordWildcard,
+											_ilike: queryWildcard,
 										},
 									},
 								},
@@ -124,10 +153,21 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 						'depublish_at',
 					])
 				);
-				andFilters.push(...getMultiOptionFilters(filters, ['content_type']));
+				andFilters.push(
+					...getMultiOptionFilters(
+						filters,
+						['author_user_group', 'content_type', 'user_profile_id', 'labels'],
+						[
+							'profile.profile_user_group.group.id',
+							'content_type',
+							'user_profile_id',
+							'content_content_labels.content_label.id',
+						]
+					)
+				);
 
 				// When you get to this point we assume you already have either the EDIT_ANY_CONTENT_PAGES or EDIT_OWN_CONTENT_PAGES permission
-				if (!PermissionService.hasPerm(user, PermissionName.EDIT_ANY_CONTENT_PAGES)) {
+				if (!hasPerm(EDIT_ANY_CONTENT_PAGES)) {
 					// Add filter to only allow the content pages for which the user is the author
 					andFilters.push({ user_profile_id: { _eq: get(user, 'profile.id') } });
 				}
@@ -161,7 +201,8 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 				icon: 'alert-triangle',
 			});
 		}
-	}, [user, setContentPages, setContentPageCount, setLoadingInfo, tableState, t]);
+		setIsLoading(false);
+	}, [user, setContentPages, setContentPageCount, setLoadingInfo, tableState, hasPerm, t]);
 
 	useEffect(() => {
 		fetchContentPages();
@@ -181,46 +222,6 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 		})
 	);
 
-	const getColumnInfos: () => FilterableColumn[] = () => [
-		{ id: 'title', label: i18n.t('admin/content/content___titel'), sortable: true },
-		{
-			id: 'content_type',
-			label: i18n.t('admin/content/content___content-type'),
-			sortable: true,
-			filterType: 'CheckboxDropdownModal',
-			filterProps: {
-				options: contentTypeOptions,
-			},
-		},
-		{ id: 'author', label: i18n.t('admin/content/content___auteur'), sortable: true },
-		{ id: 'role', label: i18n.t('admin/content/content___rol'), sortable: true },
-		{
-			id: 'created_at',
-			label: i18n.t('admin/content/content___aangemaakt'),
-			sortable: true,
-			filterType: 'DateRangeDropdown',
-		},
-		{
-			id: 'updated_at',
-			label: i18n.t('admin/content/content___laatst-bewerkt'),
-			sortable: true,
-			filterType: 'DateRangeDropdown',
-		},
-		{
-			id: 'publish_at',
-			label: i18n.t('admin/content/content___publicatiedatum'),
-			sortable: true,
-			filterType: 'DateRangeDropdown',
-		},
-		{
-			id: 'depublish_at',
-			label: i18n.t('admin/content/content___depublicatiedatum'),
-			sortable: true,
-			filterType: 'DateRangeDropdown',
-		},
-		{ id: 'actions', label: '' },
-	];
-
 	// Methods
 	const handleDelete = async () => {
 		try {
@@ -231,10 +232,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 			await ContentService.deleteContentPage(contentToDelete.id);
 			fetchContentPages();
 			ToastService.success(
-				t(
-					'admin/content/views/content-overview___het-content-item-is-succesvol-verwijderd'
-				),
-				false
+				t('admin/content/views/content-overview___het-content-item-is-succesvol-verwijderd')
 			);
 		} catch (err) {
 			console.error(
@@ -243,8 +241,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 			ToastService.danger(
 				t(
 					'admin/content/views/content-overview___het-verwijderen-van-het-content-item-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
@@ -252,7 +249,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 	const openModal = (content: ContentPageInfo): void => {
 		if (content.is_protected) {
 			// Only allow admins to delete protected content
-			if (PermissionService.hasPerm(user, PermissionName.EDIT_PROTECTED_PAGE_STATUS)) {
+			if (hasPerm(EDIT_PROTECTED_PAGE_STATUS)) {
 				setContentToDelete(content);
 				setIsConfirmModalOpen(true);
 			} else {
@@ -282,32 +279,97 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 		switch (columnId) {
 			case 'title':
 				return (
-					<Link to={buildLink(CONTENT_PATH.CONTENT_DETAIL, { id })}>
+					<Link to={buildLink(CONTENT_PATH.CONTENT_PAGE_DETAIL, { id })}>
 						{truncateTableValue(title)}
 					</Link>
 				);
-			case 'author':
-				return getFullName(profile) || '-';
-			case 'role':
-				return UserService.getUserRoleLabel(profile) || '-';
+
+			case 'user_profile_id':
+				return getFullName(profile, false, false) || '-';
+
+			case 'author_user_group':
+				return profile ? getUserGroupLabel(profile) || '-' : '-';
+
 			case 'content_type':
 				return (
 					get(
-						contentTypes.find(type => type.value === rowData.content_type),
+						contentTypes.find((type) => type.value === rowData.content_type),
 						'label'
 					) || '-'
 				);
+
+			case 'is_public':
+				return get(rowData, 'is_public') ? 'Ja' : 'Nee';
+
+			case 'labels':
+				const labels = rowData[columnId];
+				if (!labels || !labels.length) {
+					return '-';
+				}
+				return (
+					<TagList
+						tags={labels.map(
+							(labelObj: LabelObj): TagOption => ({
+								label: labelObj.label,
+								id: labelObj.id,
+							})
+						)}
+						swatches={false}
+					/>
+				);
+
+			case 'user_group_ids':
+				const userGroupIds = rowData[columnId];
+				if (!userGroupIds || !userGroupIds.length) {
+					return '-';
+				}
+				return (
+					<TagList
+						tags={compact(
+							userGroupIds.map((userGroupId: number): TagOption | null => {
+								const userGroup = userGroups.find(
+									(userGroup) => userGroup.id === userGroupId
+								);
+								if (!userGroup) {
+									return null;
+								}
+								if (userGroup.id === SpecialPermissionGroups.loggedInUsers) {
+									return {
+										label: t('Ingelogd'),
+										id: userGroup.id as number,
+									};
+								}
+								if (userGroup.id === SpecialPermissionGroups.loggedOutUsers) {
+									return {
+										label: t('niet-ingelogd'),
+										id: userGroup.id as number,
+									};
+								}
+								return {
+									label: userGroup.label as string,
+									id: userGroup.id as number,
+								};
+							})
+						)}
+						swatches={false}
+					/>
+				);
+
+			case 'published_at':
 			case 'publish_at':
 			case 'depublish_at':
 			case 'created_at':
 			case 'updated_at':
 				return !!rowData[columnId] ? formatDate(rowData[columnId] as string) : '-';
+
 			case 'actions':
 				return (
 					<ButtonToolbar>
 						<Button
 							icon="info"
-							onClick={() => navigate(history, CONTENT_PATH.CONTENT_DETAIL, { id })}
+							onClick={() =>
+								navigate(history, CONTENT_PATH.CONTENT_PAGE_DETAIL, { id })
+							}
 							size="small"
 							title={t('admin/content/views/content-overview___bekijk-content')}
 							ariaLabel={t('admin/content/views/content-overview___bekijk-content')}
@@ -338,16 +400,15 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 						/>
 						<Button
 							icon="edit"
-							onClick={() => navigate(history, CONTENT_PATH.CONTENT_EDIT, { id })}
+							onClick={() =>
+								navigate(history, CONTENT_PATH.CONTENT_PAGE_EDIT, { id })
+							}
 							size="small"
 							title={t('admin/content/views/content-overview___pas-content-aan')}
 							ariaLabel={t('admin/content/views/content-overview___pas-content-aan')}
 							type="secondary"
 						/>
-						{PermissionService.hasPerm(
-							user,
-							PermissionName.DELETE_ANY_CONTENT_PAGES
-						) && (
+						{hasPerm(DELETE_ANY_CONTENT_PAGES) && (
 							<Button
 								icon="delete"
 								onClick={() => openModal(rowData)}
@@ -365,7 +426,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 				);
 
 			default:
-				return rowData[columnId];
+				return truncateTableValue(rowData[columnId] || '-');
 		}
 	};
 
@@ -384,7 +445,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 						eaque!
 					</Trans>
 				</p>
-				{PermissionService.hasPerm(user, PermissionName.CREATE_CONTENT_PAGES) && (
+				{hasPerm(CREATE_CONTENT_PAGES) && (
 					<Spacer margin="top">
 						<Button
 							icon="plus"
@@ -392,7 +453,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 							title={t(
 								'admin/content/views/content-overview___maak-een-nieuwe-content-pagina-aan'
 							)}
-							onClick={() => history.push(CONTENT_PATH.CONTENT_CREATE)}
+							onClick={() => history.push(CONTENT_PATH.CONTENT_PAGE_CREATE)}
 						/>
 					</Spacer>
 				)}
@@ -409,7 +470,17 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 				<FilterTable
 					data={contentPages}
 					itemsPerPage={ITEMS_PER_PAGE}
-					columns={getColumnInfos()}
+					columns={GET_CONTENT_PAGE_OVERVIEW_COLUMNS(
+						contentTypeOptions,
+						setSelectedCheckboxes(
+							userGroupOptions,
+							get(tableState, 'user_group', []) as string[]
+						),
+						setSelectedCheckboxes(
+							contentPageLabelOptions,
+							get(tableState, 'label', []) as string[]
+						)
+					)}
 					dataCount={contentPageCount}
 					searchTextPlaceholder={t(
 						'admin/content/views/content-overview___zoeken-op-auteur-titel-rol'
@@ -421,6 +492,7 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 					renderCell={renderTableCell as any}
 					className="c-content-overview__table"
 					onTableStateChanged={setTableState}
+					isLoading={isLoading}
 				/>
 				<DeleteObjectModal
 					deleteObjectCallback={handleDelete}
@@ -455,15 +527,18 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 	};
 
 	return (
-		<AdminLayout pageTitle={t('admin/content/views/content-overview___content-overzicht')}>
+		<AdminLayout
+			pageTitle={t('admin/content/views/content-overview___content-overzicht')}
+			size="full-width"
+		>
 			<AdminLayoutTopBarRight>
-				{PermissionService.hasPerm(user, PermissionName.CREATE_CONTENT_PAGES) && (
+				{hasPerm(CREATE_CONTENT_PAGES) && (
 					<Button
 						label={t('admin/content/views/content-overview___content-toevoegen')}
 						title={t(
 							'admin/content/views/content-overview___maak-een-nieuwe-content-pagina-aan'
 						)}
-						onClick={() => history.push(CONTENT_PATH.CONTENT_CREATE)}
+						onClick={() => history.push(CONTENT_PATH.CONTENT_PAGE_CREATE)}
 					/>
 				)}
 			</AdminLayoutTopBarRight>
@@ -483,15 +558,11 @@ const ContentOverview: FunctionComponent<ContentOverviewProps> = ({ history, use
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<LoadingErrorLoadedComponent
-							loadingInfo={loadingInfo}
-							dataObject={contentPages}
-							render={renderContentOverview}
-						/>
-					</Container>
-				</Container>
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={contentPages}
+					render={renderContentOverview}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

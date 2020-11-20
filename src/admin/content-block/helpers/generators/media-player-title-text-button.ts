@@ -1,9 +1,10 @@
-import { CheckboxProps } from '@viaa/avo2-components';
+import { CheckboxProps, TextInputProps } from '@viaa/avo2-components';
 
 import { FileUploadProps } from '../../../../shared/components/FileUpload/FileUpload';
-import { PHOTO_TYPES, VIDEO_TYPES } from '../../../../shared/helpers/files';
+import { PHOTO_TYPES } from '../../../../shared/helpers/files';
 import i18n from '../../../../shared/translations/i18n';
 import { GET_ADMIN_ICON_OPTIONS } from '../../../shared/constants';
+import { validateFlowplayerVideoUrl } from '../../../shared/helpers';
 import {
 	ContentBlockConfig,
 	ContentBlockEditor,
@@ -18,8 +19,8 @@ import {
 	BLOCK_FIELD_DEFAULTS,
 	BLOCK_STATE_DEFAULTS,
 	FILE_FIELD,
+	ITEM_PICKER_FIELD,
 	TEXT_FIELD,
-	VIDEO_FIELD,
 } from './defaults';
 
 export const INITIAL_MEDIA_PLAYER_TITLE_TEXT_BUTTON_COMPONENTS_STATE = (): MediaPlayerTitleTextButtonBlockComponentState => ({
@@ -53,18 +54,18 @@ export const MEDIA_PLAYER_TITLE_TEXT_BUTTON_BLOCK_CONFIG = (
 				),
 				editorType: ContentBlockEditor.TextInput,
 			},
-			mediaItem: VIDEO_FIELD(),
-			mediaSrc: FILE_FIELD(undefined, {
+			mediaItem: ITEM_PICKER_FIELD(),
+			mediaSrc: TEXT_FIELD(undefined, {
 				label: i18n.t(
-					'admin/content-block/helpers/generators/media-player-title-text-button___eigen-video-uploaden-optioneel'
+					'admin/content-block/helpers/generators/media-player-title-text-button___eigen-video-url-van-flowplayer-com-optioneel'
 				),
-				validator: undefined,
+				editorType: ContentBlockEditor.TextInput,
+				validator: validateFlowplayerVideoUrl,
 				editorProps: {
-					allowMulti: false,
-					allowedTypes: VIDEO_TYPES,
-					assetType: 'CONTENT_BLOCK_IMAGE',
-					ownerId: '',
-				} as FileUploadProps,
+					placeholder: i18n.t(
+						'admin/content-block/helpers/generators/media-player-title-text-button___bv-https-cdn-flowplayer-com-hls-playlist-m-3-u-8'
+					),
+				} as TextInputProps,
 			}),
 			mediaPoster: FILE_FIELD(undefined, {
 				label: i18n.t(

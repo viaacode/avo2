@@ -1,6 +1,0 @@
-export enum RelationType {
-	IS_COPY_OF = 'IS_COPY_OF',
-	IS_REPLACED_BY = 'IS_REPLACED_BY',
-	REPLACES = 'REPLACES',
-	HAS_COPY = 'HAS_COPY',
-}

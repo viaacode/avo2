@@ -1,4 +1,3 @@
-import { flatten, get } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
@@ -7,7 +6,6 @@ import {
 	BlockHeading,
 	Button,
 	ButtonToolbar,
-	Container,
 	Panel,
 	PanelBody,
 	PanelHeader,
@@ -19,18 +17,17 @@ import { DefaultSecureRouteProps } from '../../../authentication/components/Secu
 import { redirectToClientPage } from '../../../authentication/helpers/redirects';
 import { GENERATE_SITE_TITLE } from '../../../constants';
 import { LoadingErrorLoadedComponent, LoadingInfo } from '../../../shared/components';
-import { buildLink, CustomError } from '../../../shared/helpers';
+import { buildLink, CustomError, navigate } from '../../../shared/helpers';
 import { useTableSort } from '../../../shared/hooks';
-import { dataService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import {
 	renderDateDetailRows,
 	renderSimpleDetailRows,
 } from '../../shared/helpers/render-detail-fields';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import { GET_PERMISSIONS_TABLE_COLS, PERMISSION_GROUP_PATH } from '../permission-group.const';
-import { GET_PERMISSION_GROUP_BY_ID } from '../permission-group.gql';
 import { PermissionGroupService } from '../permission-group.service';
-import { Permission, PermissionGroup, PermissionsTableCols } from '../permission-group.types';
+import { PermissionGroup, PermissionsTableCols } from '../permission-group.types';
 
 interface PermissionGroupEditProps extends DefaultSecureRouteProps<{ id: string }> {}
 
@@ -40,16 +37,16 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({ hist
 	// Hooks
 	const [permissionGroup, setPermissionGroup] = useState<PermissionGroup | null>(null);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
-	const [sortColumn, sortOrder, handleSortClick] = useTableSort<PermissionsTableCols>('label');
+	const [sortColumn, sortOrder, handleSortClick] = useTableSort<PermissionsTableCols>(
+		'description',
+		'asc'
+	);
 
 	const initOrFetchPermissionGroup = useCallback(async () => {
 		try {
-			const response = await dataService.query({
-				query: GET_PERMISSION_GROUP_BY_ID,
-				variables: { id: match.params.id },
-			});
-
-			const permissionGroupObj = get(response, 'data.users_permission_groups[0]');
+			const permissionGroupObj = await PermissionGroupService.fetchPermissionGroup(
+				match.params.id
+			);
 
 			if (!permissionGroupObj) {
 				setLoadingInfo({
@@ -62,28 +59,11 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({ hist
 				return;
 			}
 
-			const permissions: Permission[] = flatten(
-				get(permissionGroupObj, 'permission_group_user_permissions', []).map(
-					(permissionGroupItem: any) => {
-						return get(permissionGroupItem, 'permissions', []);
-					}
-				)
-			);
-
-			const permGroup = {
-				permissions,
-				id: permissionGroupObj.id,
-				label: permissionGroupObj.label,
-				description: permissionGroupObj.description,
-				created_at: permissionGroupObj.created_at,
-				updated_at: permissionGroupObj.updated_at,
-			};
-			setPermissionGroup(permGroup);
+			setPermissionGroup(permissionGroupObj);
 		} catch (err) {
 			console.error(
 				new CustomError('Failed to get permission group by id', err, {
-					query: 'GET_PERMISSION_GROUP_BY_ID',
-					variables: { id: match.params.id },
+					id: match.params.id,
 				})
 			);
 			setLoadingInfo({
@@ -166,7 +146,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({ hist
 								emptyStateMessage={t(
 									'admin/permission-groups/views/permission-group-detail___deze-groep-bevat-nog-geen-permissies'
 								)}
-								onColumnClick={columId =>
+								onColumnClick={(columId) =>
 									handleSortClick(columId as PermissionsTableCols)
 								}
 								renderCell={(rowData: any, columnId: string) => rowData[columnId]}
@@ -189,10 +169,11 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({ hist
 		}
 		return (
 			<AdminLayout
-				showBackButton
+				onClickBackButton={() => navigate(history, ADMIN_PATH.PERMISSION_GROUP_OVERVIEW)}
 				pageTitle={t(
 					'admin/permission-groups/views/permission-group-detail___permissie-groep-details'
 				)}
+				size="large"
 			>
 				<AdminLayoutTopBarRight>
 					<ButtonToolbar>
@@ -211,11 +192,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({ hist
 						/>
 					</ButtonToolbar>
 				</AdminLayoutTopBarRight>
-				<AdminLayoutBody>
-					<Container mode="vertical" size="small">
-						<Container mode="horizontal">{renderDetailPage()}</Container>
-					</Container>
-				</AdminLayoutBody>
+				<AdminLayoutBody>{renderDetailPage()}</AdminLayoutBody>
 			</AdminLayout>
 		);
 	};

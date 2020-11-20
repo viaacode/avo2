@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { withRouter } from 'react-router';
 import { compose } from 'redux';
 
-import { BlockSpotlight, ButtonAction, ImageInfo } from '@viaa/avo2-components';
+import { BlockSpotlight, ButtonAction, ImageInfo, RenderLinkFunction } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../../../authentication/components/SecuredRoute';
 import { LoadingErrorLoadedComponent, LoadingInfo } from '../../../../../shared/components';
@@ -21,11 +21,12 @@ interface ProjectSpotlightProps {
 
 interface ProjectSpotlightWrapperProps {
 	elements: ProjectSpotlightProps[];
-	navigate: (action: ButtonAction) => void;
+	renderLink: RenderLinkFunction;
 }
 
-const ProjectSpotlightWrapper: FunctionComponent<ProjectSpotlightWrapperProps &
-	DefaultSecureRouteProps> = ({ elements, navigate }) => {
+const ProjectSpotlightWrapper: FunctionComponent<
+	ProjectSpotlightWrapperProps & DefaultSecureRouteProps
+> = ({ elements, renderLink }) => {
 	const [t] = useTranslation();
 
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
@@ -35,7 +36,7 @@ const ProjectSpotlightWrapper: FunctionComponent<ProjectSpotlightWrapperProps &
 
 	const fetchContentPages = useCallback(async () => {
 		try {
-			const promises = elements.map(projectInfo => {
+			const promises = elements.map((projectInfo) => {
 				const projectPath = get(projectInfo, 'project.value');
 				if (projectPath && projectPath.toString && projectPath.toString()) {
 					return ContentPageService.getContentPageByPath(
@@ -88,7 +89,7 @@ const ProjectSpotlightWrapper: FunctionComponent<ProjectSpotlightWrapperProps &
 						};
 					}
 				)}
-				navigate={navigate}
+				renderLink={renderLink}
 			/>
 		);
 	};

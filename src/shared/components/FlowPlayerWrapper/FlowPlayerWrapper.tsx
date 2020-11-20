@@ -1,4 +1,4 @@
-import { get } from 'lodash-es';
+import { get, isNil } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,7 +6,9 @@ import { AspectRatioWrapper, FlowPlayer, formatDuration, Icon } from '@viaa/avo2
 import { Avo } from '@viaa/avo2-types';
 
 import { getProfileName } from '../../../authentication/helpers/get-profile-info';
-import { CustomError, getEnv, reorderDate } from '../../helpers';
+import { CustomError, getEnv, reorderDate, toSeconds } from '../../helpers';
+import { getValidStartAndEnd } from '../../helpers/cut-start-and-end';
+import { getSubtitles } from '../../helpers/get-subtitles';
 import withUser, { UserProps } from '../../hocs/withUser';
 import { BookmarksViewsPlaysService, ToastService } from '../../services';
 import { trackEvents } from '../../services/event-logging-service';
@@ -23,10 +25,16 @@ type FlowPlayerWrapperProps = {
 	item?: Avo.Item.Item;
 	src?: string;
 	poster?: string;
+	organisationName?: string;
+	organisationLogo?: string;
+	issuedDate?: string;
+	annotationTitle?: string;
+	annotationText?: string;
 	canPlay?: boolean;
 	cuePoints?: CuePoints;
 	seekTime?: number;
 	autoplay?: boolean;
+	onPlay?: () => void;
 };
 
 /**
@@ -34,7 +42,7 @@ type FlowPlayerWrapperProps = {
  * @param props
  * @constructor
  */
-const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> = props => {
+const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> = (props) => {
 	const [t] = useTranslation();
 
 	const item: Avo.Item.Item | undefined = props.item;
@@ -79,7 +87,7 @@ const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> =
 	const handlePlay = () => {
 		// Only trigger once per video
 		if (item && item.uid && triggeredForUrl !== src) {
-			BookmarksViewsPlaysService.action('play', 'item', item.uid, undefined).catch(err => {
+			BookmarksViewsPlaysService.action('play', 'item', item.uid, undefined).catch((err) => {
 				console.error(
 					new CustomError('Failed to track item play event', err, { itemUuid: item.uid })
 				);
@@ -88,7 +96,7 @@ const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> =
 				trackEvents(
 					{
 						object: item.external_id,
-						object_type: 'avo_item_pid',
+						object_type: 'item',
 						message: `Gebruiker ${getProfileName(props.user)} heeft het item ${
 							item.external_id
 						} afgespeeld`,
@@ -96,6 +104,9 @@ const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> =
 					},
 					props.user
 				);
+				if (props.onPlay) {
+					props.onPlay();
+				}
 			}
 			setTriggeredForUrl(src || null);
 		}
@@ -108,28 +119,61 @@ const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> =
 		}
 	};
 
+	const hasHlsSupport = (): boolean => {
+		try {
+			new MediaSource();
+			return true;
+		} catch (err) {
+			return false;
+		}
+	};
+
+	const getBrowserSafeUrl = (src: string): string => {
+		if (hasHlsSupport()) {
+			return src;
+		}
+		if (src.includes('flowplayer')) {
+			return src.replace('/hls/', '/v-').replace('/playlist.m3u8', '_original.mp4');
+		} else {
+			ToastService.danger(
+				t(
+					'shared/components/flow-player-wrapper/flow-player-wrapper___deze-video-kan-niet-worden-afgespeeld-probeer-een-andere-browser'
+				)
+			);
+			return src;
+		}
+	};
+
+	const [start, end] = getValidStartAndEnd(
+		props.cuePoints?.start,
+		props.cuePoints?.end,
+		toSeconds(item?.duration)
+	);
+
 	return (
 		<div className="c-video-player t-player-skin--dark">
 			{src && (props.autoplay || clickedThumbnail || !item) ? (
 				<FlowPlayer
-					src={src}
+					src={getBrowserSafeUrl(src)}
 					seekTime={props.seekTime}
 					poster={poster}
 					title={get(item, 'title')}
-					subtitles={
+					metadata={
 						item
 							? [
-									reorderDate(item.issued || null, '.'),
-									get(item, 'organisation.name', ''),
+									props.issuedDate || reorderDate(item.issued || null, '.'),
+									props.organisationName || get(item, 'organisation.name', ''),
 							  ]
 							: undefined
 					}
 					token={getEnv('FLOW_PLAYER_TOKEN')}
 					dataPlayerId={getEnv('FLOW_PLAYER_ID')}
-					logo={get(item, 'organisation.logo_url')}
-					{...props.cuePoints}
+					logo={props.organisationLogo || get(item, 'organisation.logo_url')}
+					start={item ? start : null}
+					end={item ? end : null}
 					autoplay={(!!item && !!src) || props.autoplay}
 					canPlay={props.canPlay}
+					subtitles={getSubtitles(item)}
 					onPlay={handlePlay}
 				/>
 			) : (
@@ -143,16 +187,22 @@ const FlowPlayerWrapper: FunctionComponent<FlowPlayerWrapperProps & UserProps> =
 							<Icon name="play" className="c-play-overlay__button" />
 						</div>
 					</div>
-					{props.cuePoints &&
-						(props.cuePoints.start || props.cuePoints.start === 0) &&
-						props.cuePoints.end && (
+					{!isNil(start) &&
+						!isNil(end) &&
+						(start !== 0 || end !== toSeconds(item?.duration)) && (
 							<div className="c-cut-overlay">
 								<Icon name="scissors" />
-								{`${formatDuration(props.cuePoints.start)} - ${formatDuration(
-									props.cuePoints.end
-								)}`}
+								{`${formatDuration(start)} - ${formatDuration(end)}`}
 							</div>
 						)}
+				</div>
+			)}
+			{(!!props.annotationTitle || !!props.annotationText) && (
+				<div className="a-block-image__annotation">
+					{props.annotationTitle && <h3>&#169; {props.annotationTitle}</h3>}
+					{props.annotationText && (
+						<p className="a-flowplayer__text">{props.annotationText}</p>
+					)}
 				</div>
 			)}
 		</div>

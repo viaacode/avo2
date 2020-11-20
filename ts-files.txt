@@ -1,0 +1,5 @@
+scripts/extract-and-replace-translations.ts
+scripts/row-permissions.ts
+scripts/update-database-permissions.ts
+scripts/update-sitemap.ts
+scripts/whitelist-gql-queries.ts

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Flex } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-import { PermissionName, PermissionService } from '../authentication/helpers/permission-service';
+import { PermissionName } from '../authentication/helpers/permission-names';
+import { PermissionService } from '../authentication/helpers/permission-service';
 import { LoadingErrorLoadedComponent, LoadingInfo, ResizablePanels } from '../shared/components';
 import { CustomError } from '../shared/helpers';
 import withUser from '../shared/hocs/withUser';
@@ -30,9 +31,9 @@ const Admin: FunctionComponent<{ user: Avo.User.User }> = ({ user }) => {
 		if (PermissionService.hasPerm(user, PermissionName.VIEW_ADMIN_DASHBOARD)) {
 			const tempUserPermissions = PermissionService.getUserPermissions(user);
 			setUserPermissions(tempUserPermissions);
-			GET_NAV_ITEMS(tempUserPermissions)
+			GET_NAV_ITEMS(tempUserPermissions, user)
 				.then(setNavigationItems)
-				.catch(err => {
+				.catch((err) => {
 					console.error(new CustomError('Failed to get nav items', err));
 					ToastService.danger('Het ophalen van de navigatie items is mislukt');
 				});
@@ -46,6 +47,12 @@ const Admin: FunctionComponent<{ user: Avo.User.User }> = ({ user }) => {
 				actionButtons: ['home', 'helpdesk'],
 			});
 		}
+
+		// Remove zendesk when loading beheer after visiting the client side of the app
+		const zendeskWidget = document.querySelector('iframe#launcher');
+		if (zendeskWidget) {
+			zendeskWidget.remove();
+		}
 	}, [user, setLoadingInfo, t]);
 
 	useEffect(() => {
@@ -53,6 +60,13 @@ const Admin: FunctionComponent<{ user: Avo.User.User }> = ({ user }) => {
 			setLoadingInfo({ state: 'loaded' });
 		}
 	}, [userPermissions, navigationItems, setLoadingInfo]);
+
+	useEffect(() => {
+		const widget = document.querySelector('iframe#launcher');
+		if (widget) {
+			widget.remove();
+		}
+	}, []);
 
 	const renderAdminPage = () => {
 		if (!navigationItems || !userPermissions) {

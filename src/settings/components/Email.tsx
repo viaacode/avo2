@@ -32,16 +32,16 @@ import { CampaignMonitorService } from '../../shared/services/campaign-monitor-s
 import { NewsletterList, ReactAction } from '../../shared/types';
 import { GET_NEWSLETTER_LABELS } from '../settings.const';
 
-export interface EmailProps {}
-
 export interface EmailProps extends RouteComponentProps {
 	user: Avo.User.User;
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 enum NewsletterPreferencesActionType {
 	SET_NEWSLETTER_PREFERENCES = '@@newsletter-preferences/SET_NEWSLETTER_PREFERENCES',
 	UPDATE_NEWSLETTER_PREFERENCES = '@@newsletter-preferences/UPDATE_NEWSLETTER_PREFERENCES',
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 type NewsletterPreferencesAction = ReactAction<NewsletterPreferencesActionType>;
 

@@ -1,10 +1,10 @@
 /* import shared library */
-@Library('jenkins-shared-libs')_
+@Library('jenkins-shared-libs') _
 
 def TEMPLATEPATH = 'https://raw.githubusercontent.com/viaacode/avo2-client/master/openshift/avo2-client-tmpl-dc.yaml'
 def TEMPLATENAME = 'avo2-client'
 def TARGET_NS = 'sc-avo2'
-def templateSelector = openshift.selector( "template", "avo2-client")
+def templateSelector = openshift.selector("template", "avo2-client")
 
 // def shortCommit = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
 //def tag= sh( returnStdout: true, script: "git describe --tags").tril()
@@ -14,122 +14,137 @@ def templateSelector = openshift.selector( "template", "avo2-client")
 // and "openshift" directive/closure from the OpenShift Client Plugin for Jenkins.  Otherwise, the declarative pipeline engine
 // will not be fully engaged.
 pipeline {
-    agent {
-      node {
-        // spin up a pod to run this build on
-        label 'docker'
-      }
-    }
-    options {
-        // set a timeout of 480m for this pipeline
-        timeout(time: 480, unit: 'MINUTES')
-    }
+	agent {
+		node {
+			// spin up a pod to run this build on
+			label 'docker'
+		}
+	}
+	options {
+		// set a timeout of 480m for this pipeline
+		timeout(time: 480, unit: 'MINUTES')
+	}
 
 	environment {
-        ENDPOINT = sh(returnStdout: true, script: 'echo https://c100-e.eu-de.containers.cloud.ibm.com:31240').trim()
-        VERSION = sh(returnStdout: true, script: "git describe --tags|| echo noTagFound").trim()
-        shortCommit = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
-        BRANCH = sh(returnStdout: true, script: "git branch | grep '*' | cut -d ' ' -f2").trim()
-        REGISTRY = sh(returnStdout: true, script: 'echo docker-registry-default.meemoo-596946-2bc857e5f10eb63ab790a3a1d19a696c-0001.eu-de.containers.appdomain.cloud').trim()
-        OKD_REGISTRY = sh(returnStdout: true, script: 'echo docker-registry-default.apps.do-prd-okp-m0.do.viaa.be').trim()
-        OKD_ENDPOINT = sh(returnStdout: true, script: 'echo https://do-prd-okp-m0.do.viaa.be:8443').trim()
-    }
-    stages {
-        stage('preamble') {
-            steps {
-                
-                script {
-                    openshift.withCluster() {
-                        openshift.withProject("sc-avo2") {
-                            echo "Using project: ${openshift.project()}"
-			                echo "Testing login script for the external docker agent"
-			                sh '''#!/bin/bash
+		ENDPOINT = sh(returnStdout: true, script: 'echo https://c100-e.eu-de.containers.cloud.ibm.com:31240').trim()
+		VERSION = sh(returnStdout: true, script: "git describe --tags|| echo noTagFound").trim()
+		shortCommit = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
+		BRANCH = sh(returnStdout: true, script: "git branch | grep '*' | cut -d ' ' -f2").trim()
+		REGISTRY = sh(returnStdout: true, script: 'echo docker-registry-default.meemoo-596946-2bc857e5f10eb63ab790a3a1d19a696c-0001.eu-de.containers.appdomain.cloud').trim()
+		OKD_REGISTRY = sh(returnStdout: true, script: 'echo docker-registry-default.apps.do-prd-okp-m0.do.viaa.be').trim()
+		OKD_ENDPOINT = sh(returnStdout: true, script: 'echo https://do-prd-okp-m0.do.viaa.be:8443').trim()
+	}
+	stages {
+		stage('preamble') {
+			steps {
+
+				script {
+					openshift.withCluster() {
+						openshift.withProject("sc-avo2") {
+							echo "Using project: ${openshift.project()}"
+							echo "Testing login script for the external docker agent"
+							sh '''#!/bin/bash
                             set +x
                             login_oc.sh $ENDPOINT > /dev/null 2>&1  && oc project sc-avo2 1>/dev/null
                             '''
-                        }
-                    }
-                }//end script
-            }
-        }
+						}
+					}
+				}//end script
+			}
+		}
 
-        stage('Docker build') {
-            steps {
-                script {                   
-                        sh'''#!/bin/bash
-                        echo starting a build 
-                        make -f ./openshift/Makefile build
-                        '''        
-                } // script
-            } // steps
-        } // stage
-        stage('Run UNIT Tests') {
-                steps {
-                    script {sh'''#!/bin/bash
-                        echo "Running make unit_test ###DISABLED for build test####"                        
-                        #make -f ./openshift/Makefile unit_test
-                        '''
-                    }// end script
-                }
-            }//end stage   
-        stage('Push Image') {
-            steps {
-                script {
-                    sh'''#!/bin/bash
-                    echo "pushing image version $VERSION"
-                    make -f ./openshift/Makefile push 
-                    '''
-		        }// end script
-            }
-        }//end stage
- 
-        stage('Tag DEV Image AND rollout DEV') {
-                steps {
-                    script {
-                        sh'''#!/bin/bash
-                        echo "tagging dev"                   
-                        make -f ./openshift/Makefile tag_dev 
-                        '''
-                    }// end script
-                    script {
-                        sh'''#!/bin/bash
-                        login_oc.sh $OKD_ENDPOINT
-                        echo "Waiting deploymentconfig to rollout"
-                        make -f ./openshift/Makefile rollout_dev
-                        '''
-                    }// end script               
-                }
-            }//end stage	
+		stage('Docker build') {
+			steps {
+				script {
+					sh '''#!/bin/bash
+					echo starting a build
+					make -f ./openshift/Makefile build
+					'''
+				} // script
+			} // steps
+		} // stage
 
-        stage('Tag QAS Image AND rollout QAS') {
-                steps {
-                    script {
-                        sh'''#!/bin/bash
-                        echo "Depoying QAS on IBM"
-                        make -f ./openshift/Makefile staging
-                        '''
-                    }// end script
-                }
-            }//end stage
+		stage('Run UNIT Tests') {
+			steps {
+				script {
+					sh '''#!/bin/bash
+						echo "Running make unit_test ###DISABLED for build test####"
+						#make -f ./openshift/Makefile unit_test
+						'''
+				}// end script
+			}
+		}//end stage
 
-    } // stages
-    post {
-        always {
-            // following disabled , we dont record test data for now
-            //junit 'ci-results/*.xml'
-            
-            //archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', fingerprint: true
-            //archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', fingerprint: true
-            //archiveArtifacts artifacts: 'ci-results/*.xml', fingerprint: true
+		stage('Push Image') {
+			options {
+				timeout(time: 10, unit: "MINUTES")
+			}
+			steps {
+				script {
+					waitUntil {
+						try {
+							sh '''#!/bin/bash
+							echo "pushing image to oc version $VERSION"
+							make -f ./openshift/Makefile push_oc && make -f ./openshift/Makefile push_okd
+							'''
+							return true
+						} catch (error) {
+								echo 'Failed to push to registry'
+								return false;
+							}
+						
+					}
+				}// end script
+			}
+		}//end stage
 
-            script {
-               slackNotifier(currentBuild.currentResult)
-            }
-            sh '''#!/bin/bash
+		stage('Tag DEV Image AND rollout DEV') {
+			steps {
+				script {
+					sh '''#!/bin/bash
+					echo "tagging dev"
+					make -f ./openshift/Makefile tag_dev
+					'''
+				}// end script
+				script {
+					sh '''#!/bin/bash
+					login_oc.sh $OKD_ENDPOINT
+					echo "Waiting deploymentconfig to rollout"
+					make -f ./openshift/Makefile rollout_dev
+					'''
+				}// end script
+			}
+		}//end stage
+
+		stage('Tag QAS Image AND rollout QAS') {
+			steps {
+				script {
+					sh '''#!/bin/bash
+					echo "Depoying QAS on IBM"
+					make -f ./openshift/Makefile staging
+					'''
+				}// end script
+			}
+		}//end stage
+
+	} // stages
+	post {
+		always {
+			// following disabled , we dont record test data for now
+			//junit 'ci-results/*.xml'
+
+			//archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', fingerprint: true
+			//archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', fingerprint: true
+			//archiveArtifacts artifacts: 'ci-results/*.xml', fingerprint: true
+
+			script {
+				slackNotifier(currentBuild.currentResult)
+			}
+			sh '''#!/bin/bash
             set +x
             echo "cleaning docker images and containers"
             docker image prune -f && docker container prune -f'''
-            cleanWs()
-        }
-    }
+			cleanWs()
+		}
+	}
 } // pipeline

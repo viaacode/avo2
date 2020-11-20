@@ -52,7 +52,17 @@
 	font-size: $g-base-font-size;
 	font-weight: $g-headings-font-weight;
 	margin: 1.5rem 0;
-	font-weight: 500;
+}
+
+.c-h1.u-clickable,
+.c-h2.u-clickable,
+.c-h3.u-clickable,
+.c-h4.u-clickable {
+	color: $color-teal-bright;
+
+	&:hover {
+		text-decoration: underline;
+	}
 }
 
 .c-body-1 {

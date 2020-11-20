@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
+	<script id="Cookiebot"
+					src="https://consent.cookiebot.com/uc.js"
+					data-cbid="8fb68e92-94b2-4334-bc47-7bcda08bc9c7"
+					data-blockingmode="auto"
+					type="text/javascript"></script>
+
+	<!-- Init .env variables -->
+	<script src="%PUBLIC_URL%/env-config.js"></script>
+
+	<!-- Google Tag Manager -->
+	<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+			new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+		j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+		'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+	})(window,document,'script','dataLayer',window._ENV_.GOOGLE_ANALYTICS_ID);</script>
+	<!-- End Google Tag Manager -->
+
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<meta name="theme-color" content="#000000" />
@@ -9,16 +26,14 @@
 	<link rel="preload" href="/fonts/montserrat-italic.woff2" as="font" crossorigin>
 	<link rel="preload" href="/fonts/montserrat-medium.woff2" as="font" crossorigin>
 	<link rel="preload" href="/fonts/avenir-lt-std-medium.woff2" as="font" crossorigin>
-
-	<script id="Cookiebot"
-					src="https://consent.cookiebot.com/uc.js"
-					data-cbid="8fb68e92-94b2-4334-bc47-7bcda08bc9c7"
-					data-blockingmode="auto"
-					type="text/javascript"></script>
-	<!-- Init .env variables -->
-	<script src="%PUBLIC_URL%/env-config.js"></script>
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript>
+	<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MNSTNVJ" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+</noscript>
+<!-- End Google Tag Manager (noscript) -->
+
 <!-- No-JS fallback -->
 <noscript>You need to enable JavaScript to run this app.</noscript>
 <div id="root"></div>

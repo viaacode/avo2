@@ -1,14 +1,13 @@
-import { ExecutionResult } from '@apollo/react-common';
 import { ApolloQueryResult } from 'apollo-boost';
-import { cloneDeep, get, isNil, isString, omit, without } from 'lodash-es';
+import { cloneDeep, get, isNil, isString, without } from 'lodash-es';
 
 import { Avo } from '@viaa/avo2-types';
 import { AssignmentContentLabel } from '@viaa/avo2-types/types/assignment';
 
-import { getProfileId } from '../authentication/helpers/get-profile-info';
+import { ItemsService } from '../admin/items/items.service';
+import { getProfileId } from '../authentication/helpers/get-profile-id';
 import { CollectionService } from '../collection/collection.service';
 import { CustomError } from '../shared/helpers';
-import { addDefaultAudioStillToItem } from '../shared/helpers/default-still';
 import {
 	ApolloCacheManager,
 	AssignmentLabelsService,
@@ -17,11 +16,12 @@ import {
 } from '../shared/services';
 import i18n from '../shared/translations/i18n';
 
-import { CONTENT_LABEL_TO_QUERY, ITEMS_PER_PAGE } from './assignment.const';
+import { ITEMS_PER_PAGE } from './assignment.const';
 import {
 	DELETE_ASSIGNMENT,
 	GET_ASSIGNMENT_BY_CONTENT_ID_AND_TYPE,
 	GET_ASSIGNMENT_BY_ID,
+	GET_ASSIGNMENT_RESPONSES,
 	GET_ASSIGNMENT_WITH_RESPONSE,
 	GET_ASSIGNMENTS_BY_OWNER_ID,
 	GET_ASSIGNMENTS_BY_RESPONSE_OWNER_ID,
@@ -116,7 +116,7 @@ export class AssignmentService {
 				}
 			}
 			variables = {
-				order: canEditAssignments ? order.assignment : order,
+				order,
 				owner_profile_id: getProfileId(user),
 				offset: page * ITEMS_PER_PAGE,
 				limit: ITEMS_PER_PAGE,
@@ -149,17 +149,8 @@ export class AssignmentService {
 				});
 			}
 
-			if (canEditAssignments) {
-				return {
-					assignments: get(assignmentResponse, 'app_assignments', []),
-					count: get(assignmentResponse, 'aggregate.count', 0),
-				};
-			}
-
 			return {
-				assignments: get(assignmentResponse, 'app_assignment_responses', []).map(
-					(assignmentResponse: any) => assignmentResponse.assignment
-				),
+				assignments: get(assignmentResponse, 'app_assignments', []),
 				count: get(assignmentResponse, 'aggregate.count', 0),
 			};
 		} catch (err) {
@@ -209,7 +200,7 @@ export class AssignmentService {
 		}
 	}
 
-	public static async fetchAssignmentContent(
+	static async fetchAssignmentContent(
 		assignment: Partial<Avo.Assignment.Assignment>
 	): Promise<Avo.Assignment.Content | null> {
 		if (assignment.content_id && assignment.content_label) {
@@ -217,30 +208,20 @@ export class AssignmentService {
 				return (
 					(await CollectionService.fetchCollectionOrBundleWithItemsById(
 						assignment.content_id,
-						'collection'
+						'collection',
+						assignment.id
 					)) || null
 				);
 			}
-			const queryInfo =
-				CONTENT_LABEL_TO_QUERY[assignment.content_label as AssignmentContentLabel];
-			const response: ApolloQueryResult<Avo.Assignment.Content> = await dataService.query({
-				query: queryInfo.query,
-				variables: queryInfo.getVariables(assignment.content_id),
-			});
-
-			const newAssignmentContent = get(response, `data.${queryInfo.resultPath}`);
-
-			if (!newAssignmentContent) {
-				throw new CustomError('NOT_FOUND');
+			if (assignment.content_label === 'ITEM' && assignment.content_id) {
+				return (await ItemsService.fetchItemByExternalId(assignment.content_id)) || null;
 			}
-
-			return addDefaultAudioStillToItem(newAssignmentContent);
 		}
 
 		return null;
 	}
 
-	public static async fetchAssignmentByContentIdAndType(
+	static async fetchAssignmentByContentIdAndType(
 		contentId: string,
 		contentType: AssignmentContentLabel
 	): Promise<Partial<Avo.Assignment.Assignment>[]> {
@@ -320,7 +301,7 @@ export class AssignmentService {
 		return [errors, assignmentToSave as Avo.Assignment.Assignment];
 	}
 
-	public static async deleteAssignment(id: number | string) {
+	static async deleteAssignment(id: number | string) {
 		try {
 			await dataService.mutate({
 				mutation: DELETE_ASSIGNMENT,
@@ -333,7 +314,7 @@ export class AssignmentService {
 		}
 	}
 
-	public static async updateAssignment(
+	static async updateAssignment(
 		assignment: Partial<Avo.Assignment.Assignment>,
 		initialLabels?: Avo.Assignment.Label[],
 		updatedLabels?: Avo.Assignment.Label[]
@@ -358,9 +339,7 @@ export class AssignmentService {
 
 			AssignmentService.warnAboutDeadlineInThePast(assignmentToSave);
 
-			const response: void | ExecutionResult<
-				Avo.Assignment.Assignment
-			> = await dataService.mutate({
+			const response = await dataService.mutate<Avo.Assignment.Assignment>({
 				mutation: UPDATE_ASSIGNMENT,
 				variables: {
 					id: assignment.id,
@@ -369,15 +348,15 @@ export class AssignmentService {
 				update: ApolloCacheManager.clearAssignmentCache,
 			});
 
-			if (!response || !response.data) {
+			if (!response || !response.data || (response.errors && response.errors.length)) {
 				console.error('assignment update returned empty response', response);
 				throw new CustomError('Het opslaan van de opdracht is mislukt', null, { response });
 			}
 
 			if (initialLabels && updatedLabels) {
 				// Update labels
-				const initialLabelIds = initialLabels.map(labelObj => labelObj.id);
-				const updatedLabelIds = updatedLabels.map(labelObj => labelObj.id);
+				const initialLabelIds = initialLabels.map((labelObj) => labelObj.id);
+				const updatedLabelIds = updatedLabels.map((labelObj) => labelObj.id);
 
 				const newLabelIds = without(updatedLabelIds, ...initialLabelIds);
 				const deletedLabelIds = without(initialLabelIds, ...updatedLabelIds);
@@ -398,14 +377,12 @@ export class AssignmentService {
 		}
 	}
 
-	public static async toggleAssignmentArchiveStatus(
+	static async toggleAssignmentArchiveStatus(
 		id: number | string,
 		archived: boolean
 	): Promise<void> {
 		try {
-			const response: void | ExecutionResult<
-				Avo.Assignment.Assignment
-			> = await dataService.mutate({
+			const response = await dataService.mutate<Avo.Assignment.Assignment>({
 				mutation: UPDATE_ASSIGNMENT_ARCHIVE_STATUS,
 				variables: {
 					id,
@@ -425,14 +402,12 @@ export class AssignmentService {
 		}
 	}
 
-	public static async toggleAssignmentResponseSubmitStatus(
+	static async toggleAssignmentResponseSubmitStatus(
 		id: number | string,
 		submittedAt: string | null
 	): Promise<void> {
 		try {
-			const response: void | ExecutionResult<
-				Avo.Assignment.Assignment
-			> = await dataService.mutate({
+			const response = await dataService.mutate<Avo.Assignment.Assignment>({
 				mutation: UPDATE_ASSIGNMENT_RESPONSE_SUBMITTED_STATUS,
 				variables: {
 					id,
@@ -456,7 +431,7 @@ export class AssignmentService {
 		}
 	}
 
-	public static async insertAssignment(
+	static async insertAssignment(
 		assignment: Partial<Avo.Assignment.Assignment>,
 		addedLabels?: Avo.Assignment.Label[]
 	): Promise<Avo.Assignment.Assignment | null> {
@@ -472,9 +447,7 @@ export class AssignmentService {
 
 			AssignmentService.warnAboutDeadlineInThePast(assignmentToSave);
 
-			const response: void | ExecutionResult<
-				Avo.Assignment.Assignment
-			> = await dataService.mutate({
+			const response = await dataService.mutate<Avo.Assignment.Assignment>({
 				mutation: INSERT_ASSIGNMENT,
 				variables: {
 					assignment: assignmentToSave,
@@ -496,7 +469,7 @@ export class AssignmentService {
 
 			if (addedLabels) {
 				// Update labels
-				const addedLabelIds = addedLabels.map(labelObj => labelObj.id);
+				const addedLabelIds = addedLabels.map((labelObj) => labelObj.id);
 
 				await Promise.all([
 					AssignmentLabelsService.linkLabelsFromAssignment(id, addedLabelIds),
@@ -513,7 +486,7 @@ export class AssignmentService {
 		}
 	}
 
-	public static async insertDuplicateAssignment(
+	static async insertDuplicateAssignment(
 		title: string,
 		assignment: Partial<Avo.Assignment.Assignment> | null
 	): Promise<Avo.Assignment.Assignment | null> {
@@ -542,11 +515,11 @@ export class AssignmentService {
 		}
 	}
 
-	public static async duplicateCollectionForAssignment(
+	static async duplicateCollectionForAssignment(
 		collectionIdOrCollection: string | Avo.Collection.Collection,
 		user: Avo.User.User
 	): Promise<string> {
-		let collection: Avo.Collection.Collection | undefined = undefined;
+		let collection: Avo.Collection.Collection | undefined;
 		if (isString(collectionIdOrCollection)) {
 			collection = await CollectionService.fetchCollectionOrBundleById(
 				collectionIdOrCollection as string,
@@ -572,7 +545,7 @@ export class AssignmentService {
 		return collectionCopy.id;
 	}
 
-	public static async duplicateAssignment(
+	static async duplicateAssignment(
 		newTitle: string,
 		initialAssignment: Partial<Avo.Assignment.Assignment> | null,
 		user: Avo.User.User
@@ -642,7 +615,7 @@ export class AssignmentService {
 		}
 	}
 
-	public static async fetchAssignmentAndContent(
+	static async fetchAssignmentAndContent(
 		pupilProfileId: string,
 		assignmentId: number | string
 	): Promise<
@@ -697,11 +670,36 @@ export class AssignmentService {
 		}
 	}
 
-	public static isOwnerOfAssignment(
+	static isOwnerOfAssignment(
 		assignment: Avo.Assignment.Assignment,
 		user: Avo.User.User | undefined
 	) {
 		return getProfileId(user) === assignment.owner_profile_id;
+	}
+
+	static async getAssignmentResponses(
+		profileId: string,
+		assignmentId: number
+	): Promise<string[]> {
+		try {
+			const response: ApolloQueryResult<Avo.Assignment.Content> = await dataService.query({
+				query: GET_ASSIGNMENT_RESPONSES,
+				variables: { profileId, assignmentId },
+			});
+
+			if (response.errors) {
+				throw new CustomError('Response contains graphql errors', null, { response });
+			}
+
+			return (get(response, 'data.app_assignment_responses') || []).map(
+				(response: { id: string }) => response.id
+			);
+		} catch (err) {
+			throw new CustomError('Failed to get assignment responses from database', err, {
+				profileId,
+				query: 'GET_ASSIGNMENT_RESPONSES',
+			});
+		}
 	}
 
 	/**
@@ -711,20 +709,32 @@ export class AssignmentService {
 	 * this looks cleaner if everything loads at once instead of staggered
 	 * @param user
 	 */
-	public static async createAssignmentResponseObject(
+	static async createAssignmentResponseObject(
 		assignment: Avo.Assignment.Assignment,
 		user: Avo.User.User | undefined
 	): Promise<Avo.Assignment.Response | null> {
 		try {
-			if (this.isOwnerOfAssignment(assignment, user)) {
+			if (!user) {
 				return null;
 			}
-			const existingAssignmentResponse: Avo.Assignment.Response | null | undefined = get(
-				assignment,
-				'assignment_responses[0]'
+			if (AssignmentService.isOwnerOfAssignment(assignment, user)) {
+				return null;
+			}
+			const existingAssignmentResponses: string[] = await AssignmentService.getAssignmentResponses(
+				get(user, 'profile.id'),
+				get(assignment, 'id')
 			);
 
-			if (!isNil(existingAssignmentResponse)) {
+			if (!!existingAssignmentResponses.length) {
+				if (existingAssignmentResponses.length > 1) {
+					console.error(
+						new CustomError(
+							'Detected multiple assignment responses for the same user and the same assignment',
+							null,
+							{ existingAssignmentResponses }
+						)
+					);
+				}
 				return null;
 			}
 
@@ -768,11 +778,5 @@ export class AssignmentService {
 				assignment,
 			});
 		}
-	}
-
-	public static cleanAssignmentResponse(
-		assignmentResponse: Partial<Avo.Assignment.Response>
-	): Partial<Avo.Assignment.Response> {
-		return omit(assignmentResponse, ['__typename', 'id']);
 	}
 }

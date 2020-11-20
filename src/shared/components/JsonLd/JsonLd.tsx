@@ -11,6 +11,7 @@ export interface JsonLdProps {
 	author?: string | null;
 	publishedAt?: string | null;
 	updatedAt?: string | null;
+	keywords?: string[] | null;
 }
 
 const JsonLd: FunctionComponent<JsonLdProps> = ({
@@ -22,10 +23,11 @@ const JsonLd: FunctionComponent<JsonLdProps> = ({
 	author,
 	publishedAt,
 	updatedAt,
+	keywords = [],
 }) => {
 	document
 		.querySelectorAll('script[type="application/ld+json"]')
-		.forEach(script => script.remove());
+		.forEach((script) => script.remove());
 
 	const info = {
 		'@context': 'https://schema.org',
@@ -51,6 +53,7 @@ const JsonLd: FunctionComponent<JsonLdProps> = ({
 		},
 		datePublished: toIsoDate(publishedAt || ''),
 		dateModified: toIsoDate(updatedAt || ''),
+		keywords: (keywords || []).join(','),
 	};
 
 	const scriptElem = document.createElement('script');

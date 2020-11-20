@@ -2,13 +2,20 @@ import { isEqual } from 'lodash-es';
 import React, { FunctionComponent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { WYSIWYG, WYSIWYGMedia, WYSIWYGProps, WYSIWYGUploadInfo } from '@viaa/avo2-components';
+import {
+	WYSIWYG,
+	WYSIWYGMedia,
+	WYSIWYGProps,
+	WYSIWYGUploadInfo,
+} from '@viaa/avo2-components/dist/esm/wysiwyg';
 import { Avo } from '@viaa/avo2-types';
 
 import { WYSIWYG_OPTIONS_DEFAULT } from '../../constants';
 import { CustomError } from '../../helpers';
 import { ToastService } from '../../services';
 import { FileUploadService } from '../../services/file-upload-service';
+
+import './WYSIWYGWrapper.scss';
 
 export type WYSIWYGWrapperProps = WYSIWYGProps & {
 	fileType?: Avo.FileUpload.AssetType; // Required to enable file upload
@@ -20,7 +27,7 @@ export type WYSIWYGWrapperProps = WYSIWYGProps & {
  * @param props
  * @constructor
  */
-const WYSIWYGWrapper: FunctionComponent<WYSIWYGWrapperProps> = props => {
+const WYSIWYGWrapper: FunctionComponent<WYSIWYGWrapperProps> = (props) => {
 	const [t] = useTranslation();
 
 	const { controls, fileType, ownerId, state, onChange, ...rest } = props;
@@ -80,7 +87,7 @@ const WYSIWYGWrapper: FunctionComponent<WYSIWYGWrapperProps> = props => {
 			controls={controls || WYSIWYG_OPTIONS_DEFAULT}
 			media={media}
 			state={state}
-			onChange={newState => {
+			onChange={(newState) => {
 				if (!!onChange && !isEqual(newState, state)) {
 					onChange(newState);
 				}

@@ -12,7 +12,7 @@ export const convertToNewsletterPreferenceUpdate = (
 	const uniqKeys = keys(oldPreferences) as NewsletterList[];
 
 	const convertedPreferences: Partial<Avo.Newsletter.Preferences> = {};
-	uniqKeys.forEach(key => {
+	uniqKeys.forEach((key) => {
 		if (!isNil(newPreferences[key]) && oldPreferences[key] !== newPreferences[key]) {
 			convertedPreferences[key] = newPreferences[key];
 		}

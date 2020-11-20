@@ -1,9 +1,9 @@
-import { omit, uniq } from 'lodash-es';
+import { isArray, isNil, isString, omit, uniq } from 'lodash-es';
 import queryString from 'query-string';
 import React, { FunctionComponent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import MetaTags from 'react-meta-tags';
 import { RouteComponentProps, withRouter } from 'react-router';
+import { compose } from 'redux';
 
 import {
 	Blankslate,
@@ -20,12 +20,15 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import {
-	redirectToClientPage,
+	redirectToLoggedInHome,
+	redirectToLoggedOutHome,
 	redirectToServerLogoutPage,
 } from '../../authentication/helpers/redirects';
-import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
-import { CustomError } from '../../shared/helpers';
+import { CustomError, isMobileWidth } from '../../shared/helpers';
+import withUser, { UserProps } from '../../shared/hocs/withUser';
 import i18n from '../../shared/translations/i18n';
+
+import './ErrorView.scss';
 
 export interface ErrorViewQueryParams {
 	message?: string;
@@ -33,25 +36,20 @@ export interface ErrorViewQueryParams {
 	actionButtons?: Avo.Auth.ErrorActionButton[];
 }
 
-interface ErrorViewProps
-	extends RouteComponentProps<{
-		message?: string;
-		icon?: IconName;
-		actionButtons?: string;
-	}> {
+interface ErrorViewProps {
 	message?: string;
 	icon?: IconName;
 	actionButtons?: Avo.Auth.ErrorActionButton[];
 	children?: ReactNode;
 }
 
-const ErrorView: FunctionComponent<ErrorViewProps> = ({
+const ErrorView: FunctionComponent<ErrorViewProps & RouteComponentProps & UserProps> = ({
 	message,
 	icon,
 	children = null,
-	history,
 	location,
 	actionButtons = [],
+	user,
 }) => {
 	const [t] = useTranslation();
 
@@ -72,15 +70,19 @@ const ErrorView: FunctionComponent<ErrorViewProps> = ({
 		);
 	}
 
-	const errorMessage: string =
-		(queryParams.message as string) ||
-		message ||
-		i18n.t('error/views/error-view___de-pagina-werd-niet-gevonden');
+	const messageText = (queryParams.message as string) || message || '';
+	const errorMessage: string = isNil(messageText)
+		? i18n.t('error/views/error-view___de-pagina-werd-niet-gevonden')
+		: messageText;
 	const errorIcon = (queryParams.icon || icon || 'search') as IconName;
 	const buttons = uniq([
 		...actionButtons,
-		...(queryParams.actionButtons
-			? (queryParams.actionButtons as string).split(',').map(button => button.trim())
+		...(isArray(queryParams.actionButtons) ? queryParams.actionButtons : []),
+		...(isString(queryParams.actionButtons)
+			? queryParams.actionButtons
+					.split(',')
+					.map((button) => button.trim())
+					.filter((button) => !!button)
 			: []),
 	]);
 
@@ -96,48 +98,55 @@ const ErrorView: FunctionComponent<ErrorViewProps> = ({
 	}
 
 	const goToHome = () => {
-		redirectToClientPage(APP_PATH.LOGGED_OUT_HOME.route, history);
+		if (user) {
+			redirectToLoggedInHome(location);
+		} else {
+			redirectToLoggedOutHome(location);
+		}
+	};
+
+	const renderButtons = (btns: string[]) => {
+		const buttons = (
+			<>
+				{btns.includes('home') && (
+					<Button
+						onClick={goToHome}
+						label={t('error/views/error-view___ga-terug-naar-de-homepagina')}
+					/>
+				)}
+				{btns.includes('helpdesk') && (
+					<Button
+						type="danger"
+						onClick={() => window.zE('webWidget', 'toggle')}
+						label={t('error/views/error-view___contacteer-de-helpdesk')}
+					/>
+				)}
+			</>
+		);
+
+		if (isMobileWidth()) {
+			return <div className="c-error-buttons__mobile">{buttons}</div>;
+		} else {
+			return (
+				<Toolbar>
+					<ToolbarCenter>
+						<ButtonToolbar>{buttons}</ButtonToolbar>
+					</ToolbarCenter>
+				</Toolbar>
+			);
+		}
 	};
 
 	return (
 		<Container mode="vertical" background="alt">
 			<Container size="medium" mode="horizontal">
-				<MetaTags>
-					<title>
-						{GENERATE_SITE_TITLE(t('error/views/error-view___error-pagina-titel'))}
-					</title>
-					<meta
-						name="description"
-						content={t('error/views/error-view___error-pagina-beschrijving')}
-					/>
-				</MetaTags>
 				<Blankslate body="" icon={errorIcon} title={errorMessage}>
 					{children}
-					<Toolbar>
-						<ToolbarCenter>
-							<ButtonToolbar>
-								{buttons.includes('home') && (
-									<Button
-										onClick={goToHome}
-										label={t(
-											'error/views/error-view___ga-terug-naar-de-homepagina'
-										)}
-									/>
-								)}
-								{buttons.includes('helpdesk') && (
-									<Button
-										type="danger"
-										onClick={() => window.zE('webWidget', 'toggle')}
-										label={t('error/views/error-view___contacteer-de-helpdesk')}
-									/>
-								)}
-							</ButtonToolbar>
-						</ToolbarCenter>
-					</Toolbar>
+					{renderButtons(buttons)}
 				</Blankslate>
 			</Container>
 		</Container>
 	);
 };
 
-export default withRouter(ErrorView);
+export default compose(withRouter, withUser)(ErrorView) as FunctionComponent<ErrorViewProps>;

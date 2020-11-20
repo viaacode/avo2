@@ -1,6 +1,5 @@
 import AdminLayout from './AdminLayout/AdminLayout';
 import {
-	AdminLayoutActions,
 	AdminLayoutBody,
 	AdminLayoutHeader,
 	AdminLayoutTopBarCenter,
@@ -9,7 +8,6 @@ import {
 
 export {
 	AdminLayout,
-	AdminLayoutActions,
 	AdminLayoutBody,
 	AdminLayoutHeader,
 	AdminLayoutTopBarRight,

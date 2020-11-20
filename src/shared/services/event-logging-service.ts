@@ -1,6 +1,7 @@
+import { get } from 'lodash-es';
+
 import { Avo } from '@viaa/avo2-types';
 
-import { getProfileId } from '../../authentication/helpers/get-profile-info';
 import { getEnv } from '../helpers';
 import { fetchWithLogout } from '../helpers/fetch-with-logout';
 
@@ -13,7 +14,7 @@ interface MinimalClientEvent {
 
 export function trackEvents(
 	events: MinimalClientEvent[] | MinimalClientEvent,
-	user: Avo.User.User
+	user: Avo.User.User | null | undefined
 ) {
 	try {
 		let eventsArray: MinimalClientEvent[];
@@ -27,8 +28,8 @@ export function trackEvents(
 				return {
 					occurred_at: new Date().toISOString(),
 					source_url: window.location.href, // url when the event was triggered
-					subject: getProfileId(user), // Entity making causing the event
-					subject_type: 'user_uuid',
+					subject: get(user, 'profile.id', ''), // Entity making causing the event
+					subject_type: 'user',
 					...event,
 				};
 			}

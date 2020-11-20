@@ -4,6 +4,7 @@ import { SecuredRoute } from '../../authentication/components';
 
 import { ITEMS_PATH } from './items.const';
 import { ItemDetail, ItemsOverview } from './views';
+import PublishItemsOverview from './views/PublishItemsOverview';
 
 export const renderItemRoutes = (): ReactNode[] => [
 	<SecuredRoute
@@ -17,5 +18,14 @@ export const renderItemRoutes = (): ReactNode[] => [
 		component={ItemDetail}
 		exact
 		path={ITEMS_PATH.ITEM_DETAIL}
+	/>,
+];
+
+export const renderPublishItemRoutes = (): ReactNode[] => [
+	<SecuredRoute
+		key={ITEMS_PATH.PUBLISH_ITEMS_OVERVIEW}
+		component={PublishItemsOverview}
+		exact
+		path={ITEMS_PATH.PUBLISH_ITEMS_OVERVIEW}
 	/>,
 ];

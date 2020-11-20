@@ -1,44 +1,40 @@
 import { gql } from 'apollo-boost';
 
-export const GET_AVAILABLE_CONTENT_TYPES = gql`
-	{
-		app_content(distinct_on: content_type) {
-			content_type
-		}
-	}
-`;
-
 export const GET_CONTENT_PAGES = gql`
-	query getContent(
+	query getContentPages(
 		$where: app_content_bool_exp
 		$offset: Int = 0
 		$limit: Int = 10
 		$orderBy: [app_content_order_by!] = {}
 	) {
 		app_content(where: $where, limit: $limit, offset: $offset, order_by: $orderBy) {
+			id
 			content_type
 			created_at
 			depublish_at
 			description
 			seo_description
-			id
+			meta_description
 			thumbnail_path
 			is_protected
 			is_public
 			path
+			user_profile_id
 			profile {
 				organisation {
+					or_id
 					logo_url
 					name
-					or_id
 				}
-				user: usersByuserId {
-					first_name
-					last_name
-					role {
+				profile_user_groups {
+					groups {
 						id
 						label
 					}
+				}
+				user: usersByuserId {
+					id
+					full_name
 				}
 			}
 			publish_at
@@ -49,8 +45,9 @@ export const GET_CONTENT_PAGES = gql`
 			user_profile_id
 			content_content_labels {
 				content_label {
-					label
 					id
+					label
+					link_to
 				}
 			}
 		}
@@ -62,30 +59,12 @@ export const GET_CONTENT_PAGES = gql`
 	}
 `;
 
-export const GET_PROJECT_CONTENT_PAGES = gql`
-	query getContent($limit: Int = 20, $orderBy: [app_content_order_by!] = {}) {
-		app_content(where: { content_type: { _eq: PROJECT } }, limit: $limit, order_by: $orderBy) {
-			path
-			title
-		}
-	}
-`;
-
-export const GET_CONTENT_PAGES_BY_TITLE = gql`
-	query getContent($title: String!, $limit: Int = 20, $orderBy: [app_content_order_by!] = {}) {
-		app_content(where: { title: { _ilike: $title } }, limit: $limit, order_by: $orderBy) {
-			path
-			title
-		}
-	}
-`;
-
-export const GET_PROJECT_CONTENT_PAGES_BY_TITLE = gql`
-	query getContent($title: String!, $limit: Int = 20, $orderBy: [app_content_order_by!] = {}) {
+export const GET_PUBLIC_PROJECT_CONTENT_PAGES = gql`
+	query getPublicProjectContentPages($limit: Int = 20, $orderBy: [app_content_order_by!] = {}) {
 		app_content(
-			where: { title: { _ilike: $title }, content_type: { _eq: PROJECT } }
 			limit: $limit
 			order_by: $orderBy
+			where: { content_type: { _eq: PROJECT }, is_public: { _eq: true } }
 		) {
 			path
 			title
@@ -93,101 +72,36 @@ export const GET_PROJECT_CONTENT_PAGES_BY_TITLE = gql`
 	}
 `;
 
-export const GET_CONTENT_PAGE_BY_PATH = gql`
-	query getContentPageByPath($path: String!) {
-		app_content(where: { path: { _eq: $path } }) {
-			thumbnail_path
-			title
-			content_type
-			content_width
-			created_at
-			depublish_at
-			description
-			seo_description
-			id
-			is_protected
-			is_public
-			publish_at
+export const GET_PUBLIC_CONTENT_PAGES_BY_TITLE = gql`
+	query getPublicContentPageByTitle(
+		$limit: Int = 20
+		$orderBy: [app_content_order_by!] = {}
+		$where: app_content_bool_exp = {}
+	) {
+		app_content(where: $where, limit: $limit, order_by: $orderBy) {
 			path
-			contentBlockssBycontentId(order_by: { position: asc }) {
-				content_block_type
-				content_id
-				created_at
-				id
-				position
-				updated_at
-				variables
-				enum_content_block_type {
-					description
-					value
-				}
-			}
-			user_group_ids
+			title
 		}
 	}
 `;
 
-export const GET_CONTENT_PAGES_WITH_BLOCKS = gql`
-	query getContent(
-		$where: app_content_bool_exp
-		$offset: Int = 0
-		$limit: Int = 10
+export const GET_PUBLIC_PROJECT_CONTENT_PAGES_BY_TITLE = gql`
+	query getPublicProjectContentPagesByTitle(
+		$title: String!
+		$limit: Int = 20
 		$orderBy: [app_content_order_by!] = {}
 	) {
-		app_content(where: $where, limit: $limit, offset: $offset, order_by: $orderBy) {
-			content_type
-			created_at
-			depublish_at
-			description
-			seo_description
-			id
-			thumbnail_path
-			is_protected
-			is_public
+		app_content(
+			where: {
+				title: { _ilike: $title }
+				content_type: { _eq: PROJECT }
+				is_public: { _eq: true }
+			}
+			limit: $limit
+			order_by: $orderBy
+		) {
 			path
-			profile {
-				organisation {
-					logo_url
-					name
-					or_id
-				}
-				user: usersByuserId {
-					first_name
-					last_name
-					role {
-						id
-						label
-					}
-				}
-			}
-			publish_at
-			published_at
 			title
-			updated_at
-			content_content_labels {
-				content_label {
-					label
-					id
-				}
-			}
-			contentBlockssBycontentId(order_by: { position: asc }) {
-				content_block_type
-				content_id
-				created_at
-				id
-				position
-				updated_at
-				variables
-				enum_content_block_type {
-					description
-					value
-				}
-			}
-		}
-		app_content_aggregate(where: $where) {
-			aggregate {
-				count
-			}
 		}
 	}
 `;
@@ -201,24 +115,29 @@ export const GET_CONTENT_BY_ID = gql`
 			depublish_at
 			description
 			seo_description
+			meta_description
 			id
 			thumbnail_path
 			is_protected
 			is_public
 			path
+			user_profile_id
 			profile {
 				organisation {
 					logo_url
 					name
 					or_id
 				}
-				user: usersByuserId {
-					first_name
-					last_name
-					role {
-						id
+				profile_user_groups {
+					groups {
 						label
+						id
 					}
+				}
+				user: usersByuserId {
+					id
+					full_name
+					mail
 				}
 			}
 			publish_at
@@ -226,10 +145,12 @@ export const GET_CONTENT_BY_ID = gql`
 			title
 			updated_at
 			user_group_ids
+			user_profile_id
 			content_content_labels {
 				content_label {
 					label
 					id
+					link_to
 				}
 			}
 			contentBlockssBycontentId(order_by: { position: asc }) {
@@ -250,7 +171,7 @@ export const GET_CONTENT_BY_ID = gql`
 `;
 
 export const GET_CONTENT_TYPES = gql`
-	{
+	query getContentTypes {
 		lookup_enum_content_types {
 			value
 			description
@@ -293,23 +214,12 @@ export const GET_PERMISSIONS_FROM_CONTENT_PAGE_BY_PATH = gql`
 `;
 
 export const GET_CONTENT_LABELS_BY_CONTENT_TYPE = gql`
-	query getContentLabls($contentType: String!) {
+	query getContentLabels($contentType: String!) {
 		app_content_labels(where: { content_type: { _eq: $contentType } }) {
 			id
 			label
 			content_type
-		}
-	}
-`;
-
-export const INSERT_CONTENT_LABEL = gql`
-	mutation insertContentLabel($label: String!, $contentType: String!) {
-		insert_app_content_labels(objects: { content_type: $contentType, label: $label }) {
-			returning {
-				content_type
-				id
-				label
-			}
+			link_to
 		}
 	}
 `;

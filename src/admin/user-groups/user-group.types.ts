@@ -35,3 +35,8 @@ export type PermissionGroupTableCols =
 	| 'created_at'
 	| 'updated_at'
 	| 'actions';
+
+export interface UserGroup {
+	id: number;
+	label: string;
+}

@@ -1,6 +1,6 @@
 {
 	"name": "avo2-client",
-	"version": "1.0.0",
+	"version": "1.6.0",
 	"private": true,
 	"scripts": {
 		"preinstall": "npx npm-force-resolutions",
@@ -11,11 +11,11 @@
 		"unit-tests": "react-scripts test --transformIgnorePatterns \"node_modules/(?!(lodash-es|moment))/\"",
 		"lint": "tslint -p .",
 		"format": "npm run lint -- --fix",
-		"build-extract-translations-script": "tsc --sourceMap --esModuleInterop --resolveJsonModule scripts/extract-and-replace-translations.ts",
-		"extract-translations": "npm run build-extract-translations-script && dotenv -e .env node scripts/extract-and-replace-translations.js && npm run format",
-		"build-whitelist-queries": "tsc --sourceMap --esModuleInterop --resolveJsonModule scripts/whitelist-gql-queries.ts",
-		"whitelist-queries": "npm run build-whitelist-queries && node scripts/whitelist-gql-queries.js",
-		"licenses": "license-checker --csv --out licenses.csv"
+		"extract-translations": "ts-node --transpile-only --project ./scripts/tsconfig.json -- scripts/extract-and-replace-translations.ts && npm run format",
+		"whitelist-queries": "ts-node --project ./scripts/tsconfig.json -- scripts/whitelist-gql-queries.ts",
+		"update-sitemap": "ts-node --transpile-only --project ./scripts/tsconfig.json -- scripts/update-sitemap.ts",
+		"licenses": "license-checker --csv --out licenses.csv",
+		"analyse": "npm run build && source-map-explorer 'build/static/js/*.js'"
 	},
 	"contributors": [
 		"Bert Verhelst <bert.verhelst@studiohyperdrive.be>",
@@ -25,102 +25,112 @@
 	],
 	"dependencies": {
 		"@apollo/react-hooks": "^3.0.0",
-		"@viaa/avo2-components": "^1.49.0",
-		"@viaa/avo2-types": "^2.21.0",
+		"@storybook/addon-actions": "^6.0.21",
+		"@viaa/avo2-components": "^1.62.0",
+		"@viaa/avo2-types": "^2.25.0",
 		"apollo-boost": "^0.4.3",
 		"braft-editor": "^2.3.9",
 		"braft-extensions": "^0.1.0",
 		"capture-stack-trace": "^1.0.1",
 		"classnames": "^2.2.6",
 		"date-fns": "^2.0.0-beta.1",
+		"file-saver": "^2.0.2",
+		"fs-extra": "^9.0.1",
 		"glob": "^7.1.6",
 		"graphql": "^14.5.8",
-		"i18next": "^19.0.2",
+		"i18next": "^19.5.5",
 		"i18next-xhr-backend": "^3.2.2",
 		"immer": "^6.0.0",
 		"immutable": "3.8.2",
 		"lodash-es": "^4.17.11",
 		"marked": "^0.7.0",
 		"moment": "^2.24.0",
-		"node-fetch": "^2.6.0",
-		"node-sass": "^4.13.1",
+		"node-fetch": "^2.6.1",
+		"node-sass": "^4.14.1",
+		"oaf-react-router": "^2.1.1",
 		"query-string": "^6.8.3",
-		"react": "^16.8.6",
+		"react": "16.13.1",
 		"react-apollo": "^2.5.8",
 		"react-copy-to-clipboard": "^5.0.2",
 		"react-datepicker": "^2.9.6",
-		"react-dom": "^16.8.6",
+		"react-dom": "16.13.1",
 		"react-i18next": "^11.2.7",
 		"react-joyride": "^2.2.1",
 		"react-meta-tags": "^0.7.4",
+		"react-perfect-scrollbar": "^1.5.8",
 		"react-popper": "^1.3.3",
 		"react-redux": "^6.0.1",
 		"react-router-dom": "^5.0.1",
-		"react-scripts": "^3.4.0",
+		"react-scripts": "^3.4.3",
 		"react-scrollbars-custom": "^4.0.15",
 		"react-select": "^3.0.8",
+		"react-to-string": "^0.1.1",
 		"react-toastify": "^5.3.2",
 		"react-zendesk": "^0.1.5",
 		"redux": "^4.0.1",
 		"redux-devtools-extension": "^2.13.8",
 		"redux-thunk": "^2.3.0",
-		"sanitize-html": "^1.20.1",
-		"use-query-params": "^0.6.0"
+		"sanitize-html": "^1.27.4",
+		"source-map-explorer": "^2.5.0",
+		"ts-node": "^9.0.0",
+		"use-query-params": "^1.1.6",
+		"webpack": "^4.42.0"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "^8.1.0",
-		"@commitlint/config-conventional": "^7.6.0",
-		"@storybook/addon-actions": "^5.3.18",
-		"@storybook/react": "^5.3.18",
+		"@commitlint/cli": "^11.0.0",
+		"@commitlint/config-conventional": "^11.0.0",
 		"@types/classnames": "^2.2.8",
 		"@types/enzyme": "^3.9.3",
 		"@types/enzyme-adapter-react-16": "^1.0.5",
 		"@types/glob": "^7.1.1",
 		"@types/i18next-xhr-backend": "^1.4.2",
 		"@types/jest": "^24.0.25",
+		"@types/file-saver": "^2.0.1",
 		"@types/jest-expect-message": "^1.0.1",
 		"@types/lodash-es": "^4.17.3",
 		"@types/node": "12.0.2",
 		"@types/node-fetch": "^2.5.7",
 		"@types/node-zendesk": "^1.4.0",
-		"@types/react": "16.8.17",
+		"@types/react": "16.9.48",
 		"@types/react-copy-to-clipboard": "^4.3.0",
 		"@types/react-datepicker": "^2.9.3",
-		"@types/react-dom": "16.8.4",
+		"@types/react-dom": "16.9.8",
 		"@types/react-redux": "^6.0.14",
 		"@types/react-router-dom": "^4.3.3",
 		"@types/react-select": "^3.0.8",
 		"@types/redux-mock-store": "^1.0.1",
-		"@types/sanitize-html": "^1.20.2",
-		"@types/storybook__react": "^4.0.2",
+		"@typescript-eslint/parser": "^4.0.1",
+		"@typescript-eslint/eslint-plugin": "^4.0.1",
 		"axios": "^0.19.1",
 		"dotenv": "^8.2.0",
 		"dotenv-cli": "^3.1.0",
 		"enzyme": "^3.10.0",
 		"enzyme-adapter-react-16": "^1.14.0",
-		"fetch-poeditor": "^0.5.2",
 		"husky": "^2.3.0",
 		"jest-expect-message": "^1.0.2",
 		"license-checker": "^25.0.1",
 		"lint-staged": "^8.1.7",
-		"lodash": "^4.17.15",
+		"lodash": "^4.17.19",
 		"lorem-ipsum": "^2.0.3",
-		"prettier": "^1.17.1",
+		"prettier": "^2.1.2",
 		"redux-mock-store": "^1.5.3",
 		"sort-object-keys": "^1.1.3",
-		"ts-jest": "^24.1.0",
+		"ts-jest": "^26.4.1",
 		"ts-loader": "^6.0.4",
-		"tslint": "^5.16.0",
-		"tslint-config-airbnb": "^5.11.1",
+		"tslint": "^6.1.3",
+		"tslint-config-airbnb": "^5.11.2",
 		"tslint-config-prettier": "^1.18.0",
-		"tslint-plugin-prettier": "^2.0.1",
-		"typescript": "3.5.3"
+		"tslint-plugin-prettier": "^2.3.0",
+		"typescript": "4.0.2"
 	},
 	"peerDependencies": {
-		"avo2-proxy-server": "0.21.0"
+		"avo2-proxy-server": "1.4.0"
 	},
 	"resolutions": {
-		"immutable": "3.8.2"
+		"immutable": "3.8.2",
+		"oaf-routing": "4.0.1",
+		"react": "16.13.1",
+		"isomorphic-fetch": "3.0.0"
 	},
 	"browserslist": {
 		"production": [
@@ -132,6 +142,22 @@
 			"last 1 chrome version",
 			"last 1 firefox version",
 			"last 1 safari version"
+		]
+	},
+	"eslintConfig": {
+		"extends": [
+			"react-app"
+		],
+		"rules": {},
+		"overrides": [
+			{
+				"files": [
+					"**/*.ts?(x)"
+				],
+				"rules": {
+					"@typescript-eslint/no-use-before-define": "off"
+				}
+			}
 		]
 	}
 }

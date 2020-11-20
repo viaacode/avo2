@@ -2,8 +2,9 @@ import { isNil } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
-import { Button, ButtonToolbar, Container, Spacer } from '@viaa/avo2-components';
+import { Button, ButtonToolbar, Spacer } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
 import { redirectToClientPage } from '../../../authentication/helpers/redirects';
@@ -14,11 +15,13 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
-import { CustomError, formatDate, navigate } from '../../../shared/helpers';
+import { buildLink, CustomError, formatDate, navigate } from '../../../shared/helpers';
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import { ItemsTableState } from '../../items/items.types';
 import FilterTable, { getFilters } from '../../shared/components/FilterTable/FilterTable';
+import { UpdatePermissionsButton } from '../../shared/components/UpdatePermissionsButton/UpdatePermissionsButton';
 import { getDateRangeFilters, getQueryFilter } from '../../shared/helpers/filters';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import {
@@ -40,14 +43,16 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 	const [userGroupCount, setUserGroupCount] = useState<number>(0);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [tableState, setTableState] = useState<Partial<UserGroupTableState>>({});
+	const [isLoading, setIsLoading] = useState<boolean>(false);
 
 	const fetchUserGroups = useCallback(async () => {
+		setIsLoading(true);
 		const generateWhereObject = (filters: Partial<ItemsTableState>) => {
 			const andFilters: any[] = [];
 			andFilters.push(
-				...getQueryFilter(filters.query, (queryWordWildcard: string) => [
-					{ label: { _ilike: queryWordWildcard } },
-					{ description: { _ilike: queryWordWildcard } },
+				...getQueryFilter(filters.query, (queryWildcard: string) => [
+					{ label: { _ilike: queryWildcard } },
+					{ description: { _ilike: queryWildcard } },
 				])
 			);
 			andFilters.push(...getDateRangeFilters(filters, ['created_at', 'updated_at']));
@@ -74,6 +79,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 				),
 			});
 		}
+		setIsLoading(false);
 	}, [setUserGroups, setLoadingInfo, t, tableState]);
 
 	useEffect(() => {
@@ -92,8 +98,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 				ToastService.danger(
 					t(
 						'admin/user-groups/views/user-group-overview___het-verwijderen-van-de-gebruikersgroep-is-mislukt-probeer-de-pagina-te-herladen'
-					),
-					false
+					)
 				);
 				return;
 			}
@@ -101,8 +106,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 			await UserGroupService.deleteUserGroup(userGroupIdToDelete);
 			await fetchUserGroups();
 			ToastService.success(
-				t('admin/user-groups/views/user-group-overview___de-gebruikersgroep-is-verwijdert'),
-				false
+				t('admin/user-groups/views/user-group-overview___de-gebruikersgroep-is-verwijdert')
 			);
 		} catch (err) {
 			console.error(
@@ -114,8 +118,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-overview___het-verwijderen-van-de-gebruikersgroep-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
@@ -125,8 +128,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 			ToastService.danger(
 				t(
 					'admin/user-groups/views/user-group-overview___de-gebruikersgroep-kon-niet-worden-verwijdert-probeer-de-pagina-te-herladen'
-				),
-				false
+				)
 			);
 			return;
 		}
@@ -136,6 +138,13 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 
 	const renderTableCell = (rowData: Partial<UserGroup>, columnId: UserGroupOverviewTableCols) => {
 		switch (columnId) {
+			case 'label':
+				return (
+					<Link to={buildLink(ADMIN_PATH.USER_GROUP_DETAIL, { id: rowData.id })}>
+						{truncateTableValue(rowData[columnId])}
+					</Link>
+				);
+
 			case 'created_at':
 			case 'updated_at':
 				return formatDate(rowData[columnId]) || '-';
@@ -241,6 +250,7 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 					noContentMatchingFiltersMessage={t(
 						'admin/user-groups/views/user-group-overview___er-zijn-geen-gebruikersgroepen-die-voldoen-aan-de-filters'
 					)}
+					isLoading={isLoading}
 				/>
 				<DeleteObjectModal
 					deleteObjectCallback={handleDelete}
@@ -254,16 +264,20 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 	return (
 		<AdminLayout
 			pageTitle={t('admin/user-groups/views/user-group-overview___gebruikersgroepen')}
+			size="full-width"
 		>
 			<AdminLayoutTopBarRight>
-				<Button
-					label={t(
-						'admin/user-groups/views/user-group-overview___gebruikersgroep-toevoegen'
-					)}
-					onClick={() => {
-						redirectToClientPage(USER_GROUP_PATH.USER_GROUP_CREATE, history);
-					}}
-				/>
+				<ButtonToolbar>
+					<UpdatePermissionsButton />
+					<Button
+						label={t(
+							'admin/user-groups/views/user-group-overview___gebruikersgroep-toevoegen'
+						)}
+						onClick={() => {
+							redirectToClientPage(USER_GROUP_PATH.USER_GROUP_CREATE, history);
+						}}
+					/>
+				</ButtonToolbar>
 			</AdminLayoutTopBarRight>
 			<AdminLayoutBody>
 				<MetaTags>
@@ -281,15 +295,11 @@ const UserGroupGroupOverview: FunctionComponent<UserGroupOverviewProps> = ({ his
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<LoadingErrorLoadedComponent
-							loadingInfo={loadingInfo}
-							dataObject={userGroups}
-							render={renderUserGroupPageBody}
-						/>
-					</Container>
-				</Container>
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={userGroups}
+					render={renderUserGroupPageBody}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

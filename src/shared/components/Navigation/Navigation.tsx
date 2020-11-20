@@ -1,7 +1,10 @@
-import { last } from 'lodash-es';
-import React, { FunctionComponent, ReactText, useEffect, useState } from 'react';
+import { get, last } from 'lodash-es';
+import React, { FunctionComponent, ReactText, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router';
 import { Link, RouteComponentProps } from 'react-router-dom';
+import { Dispatch } from 'redux';
 
 import {
 	Avatar,
@@ -15,8 +18,8 @@ import {
 	ToolbarLeft,
 	ToolbarRight,
 } from '@viaa/avo2-components';
+import { Avo } from '@viaa/avo2-types';
 
-import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
 import {
 	getFirstName,
 	getProfileAvatar,
@@ -26,9 +29,16 @@ import {
 	redirectToClientPage,
 	redirectToExternalPage,
 } from '../../../authentication/helpers/redirects';
+import { getLoginStateAction } from '../../../authentication/store/actions';
+import {
+	selectLogin,
+	selectLoginError,
+	selectLoginLoading,
+} from '../../../authentication/store/selectors';
 import { APP_PATH } from '../../../constants';
+import { AppState } from '../../../store';
+import { insideIframe } from '../../helpers/inside-iframe';
 import { getLocation, mapNavElementsToNavigationItems } from '../../helpers/navigation';
-import withUser from '../../hocs/withUser';
 import { ToastService } from '../../services';
 import {
 	AppContentNavElement,
@@ -40,20 +50,29 @@ import { NavigationItemInfo } from '../../types';
 import './Navigation.scss';
 import NavigationItem from './NavigationItem';
 
+export interface NavigationParams extends RouteComponentProps {
+	loginState: Avo.Auth.LoginResponse | null;
+	loginStateLoading: boolean;
+	loginStateError: boolean;
+	getLoginState: () => Dispatch;
+}
+
 /**
  * Main navigation bar component
  * @param history
  * @param location
  * @param match
  * @param loginMessage
- * @param user
  * @constructor
  */
-export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
+export const Navigation: FunctionComponent<NavigationParams> = ({
+	loginState,
+	loginStateLoading,
+	loginStateError,
+	getLoginState,
 	history,
 	location,
 	match,
-	user,
 }) => {
 	const [t] = useTranslation();
 
@@ -62,24 +81,36 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 	const [primaryNavItems, setPrimaryNavItems] = useState<AppContentNavElement[]>([]);
 	const [secondaryNavItems, setSecondaryNavItems] = useState<AppContentNavElement[]>([]);
 
+	const user = get(loginState, 'userInfo');
+
 	useEffect(() => {
-		getNavigationItems()
-			.then((navItems: NavItemMap) => {
-				setPrimaryNavItems(navItems['hoofdnavigatie-links']);
-				setSecondaryNavItems(navItems['hoofdnavigatie-rechts']);
-			})
-			.catch(err => {
-				console.error('Failed to get navigation items', err);
-				ToastService.danger(
-					t(
-						'shared/components/navigation/navigation___het-ophalen-van-de-navigatie-items-is-mislukt-probeer-later-opnieuw'
-					)
-				);
-			});
-	}, [history, t, user]);
+		if (!loginState && !loginStateLoading && !loginStateError) {
+			getLoginState();
+			return;
+		}
+	});
+
+	const updateNavigationItems = useCallback(async () => {
+		try {
+			const navItems: NavItemMap = await getNavigationItems();
+			setPrimaryNavItems(navItems['hoofdnavigatie-links']);
+			setSecondaryNavItems(navItems['hoofdnavigatie-rechts']);
+		} catch (err) {
+			console.error('Failed to get navigation items', err);
+			ToastService.danger(
+				t(
+					'shared/components/navigation/navigation___het-ophalen-van-de-navigatie-items-is-mislukt-probeer-later-opnieuw'
+				)
+			);
+		}
+	}, [t]);
+
+	useEffect(() => {
+		updateNavigationItems();
+	}, [updateNavigationItems]);
 
 	const mapNavItems = (navItems: NavigationItemInfo[], isMobile: boolean) => {
-		return navItems.map(item => (
+		return navItems.map((item) => (
 			<NavigationItem
 				key={item.key}
 				item={item}
@@ -113,8 +144,9 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 		const logoutNavItem = last(dynamicNavItems) as NavigationItemInfo;
 
 		if (
-			(user && logoutNavItem.location !== APP_PATH.LOGOUT.route) ||
-			(!user && logoutNavItem.location === APP_PATH.LOGOUT.route)
+			// (user && logoutNavItem.location !== APP_PATH.LOGOUT.route) ||
+			!user &&
+			logoutNavItem.location === APP_PATH.LOGOUT.route
 		) {
 			// Avoid flashing the menu items for a second without them being in a dropdown menu
 			return [];
@@ -142,7 +174,7 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 							menuItems={[
 								dynamicNavItems
 									.slice(0, dynamicNavItems.length - 1)
-									.map(navItem => ({
+									.map((navItem) => ({
 										id: navItem.key as string,
 										label: navItem.label as string,
 									})),
@@ -175,7 +207,7 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 				menuItemId.toString().substring('nav-item-'.length),
 				10
 			);
-			const navItem = secondaryNavItems.find(navItem => navItem.id === navItemId);
+			const navItem = secondaryNavItems.find((navItem) => navItem.id === navItemId);
 			if (!navItem) {
 				console.error('Could not find navigation item by id', { menuItemId });
 				ToastService.danger(
@@ -206,6 +238,31 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 		}
 	};
 
+	const isInsideIframe = insideIframe();
+
+	if (isInsideIframe) {
+		return (
+			<Navbar background="inverse" position="fixed" placement="top">
+				<Container mode="horizontal">
+					<Toolbar>
+						<ToolbarLeft>
+							<ToolbarItem>
+								<h1 className="c-brand">
+									<img
+										className="c-brand__image"
+										src="/images/avo-logo-i.svg"
+										alt={t(
+											'shared/components/navigation/navigation___archief-voor-onderwijs-logo'
+										)}
+									/>
+								</h1>
+							</ToolbarItem>
+						</ToolbarLeft>
+					</Toolbar>
+				</Container>
+			</Navbar>
+		);
+	}
 	return (
 		<>
 			<Navbar background="inverse" position="fixed" placement="top">
@@ -300,4 +357,16 @@ export const Navigation: FunctionComponent<DefaultSecureRouteProps> = ({
 	);
 };
 
-export default withUser(Navigation) as FunctionComponent<RouteComponentProps>;
+const mapStateToProps = (state: AppState) => ({
+	loginState: selectLogin(state),
+	loginStateLoading: selectLoginLoading(state),
+	loginStateError: selectLoginError(state),
+});
+
+const mapDispatchToProps = (dispatch: Dispatch) => {
+	return {
+		getLoginState: () => dispatch(getLoginStateAction() as any),
+	};
+};
+
+export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Navigation));

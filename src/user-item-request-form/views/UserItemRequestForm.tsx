@@ -1,5 +1,5 @@
 import { get } from 'lodash-es';
-import { Tickets } from 'node-zendesk';
+import { Requests } from 'node-zendesk';
 import queryString from 'query-string';
 import React, { FunctionComponent, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -16,15 +16,19 @@ import {
 	Spinner,
 	TextArea,
 } from '@viaa/avo2-components';
+import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
+import { getProfileName } from '../../authentication/helpers/get-profile-info';
 import { redirectToClientPage } from '../../authentication/helpers/redirects';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
 import { FileUpload } from '../../shared/components';
-import { isMobileWidth } from '../../shared/helpers';
-import { isPhoto } from '../../shared/helpers/files';
+import Html from '../../shared/components/Html/Html';
+import { getFullName, isMobileWidth } from '../../shared/helpers';
+import { DOC_TYPES, isPhoto } from '../../shared/helpers/files';
 import { sanitizeHtml, sanitizePresets } from '../../shared/helpers/sanitize';
 import { ToastService, ZendeskService } from '../../shared/services';
+import { trackEvents } from '../../shared/services/event-logging-service';
 
 export interface UserItemRequestFormProps extends DefaultSecureRouteProps {}
 
@@ -69,7 +73,7 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 	};
 
 	const onSend = async () => {
-		let ticket: Tickets.CreateModel | undefined;
+		let ticket: Requests.CreateModel | undefined;
 		try {
 			const errors = getValidationErrors();
 			if (errors.length) {
@@ -99,15 +103,6 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 		body.description
   }</dd>
   <dt><Trans i18nKey="user-item-request-form/views/user-item-request-form___bijlage">Bijlage</Trans></dt><dd>${renderAttachment()}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___voornaam">Voornaam</Trans></dt><dd>${
-		body.firstName
-  }</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___achternaam">Achternaam</Trans></dt><dd>${
-		body.lastName
-  }</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___email">Email</Trans></dt><dd>${
-		body.email
-  }</dd>
   <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___school-of-organisatie">School of organisatie</Trans></dt><dd>${
 		body.organization
   }</dd>
@@ -123,8 +118,23 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 				subject: t(
 					'user-item-request-form/views/user-item-request-form___gebruikersaanvraag-item'
 				),
+				requester: {
+					email: get(user, 'mail'),
+					name: getFullName(user as { profile: Avo.User.Profile }, true, false) || '',
+				},
 			};
 			await ZendeskService.createTicket(ticket);
+
+			trackEvents(
+				{
+					object: description,
+					object_type: 'item',
+					message: `${getProfileName(user)} heeft een item aangevraagd`,
+					action: 'request',
+				},
+				user
+			);
+
 			ToastService.success(
 				t(
 					'authentication/views/registration-flow/r-4-manual-registration___je-aanvraag-is-verstuurt'
@@ -194,9 +204,9 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 							<FileUpload
 								assetType="ZENDESK_ATTACHMENT"
 								urls={attachmentUrl ? [attachmentUrl] : []}
-								onChange={attachments => setAttachmentUrl(attachments[0])}
+								onChange={(attachments) => setAttachmentUrl(attachments[0])}
 								ownerId=""
-								allowedTypes={[]} // allow all types
+								allowedTypes={DOC_TYPES}
 								allowMulti={false}
 								label={t(
 									'user-item-request-form/views/user-item-request-form___selecteer-een-betand-word-excel-max-xxx-mb'
@@ -204,7 +214,7 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 							/>
 						)}
 					</FormGroup>
-					<Spacer margin={['top', 'bottom-large']}>
+					<Spacer margin={['top', 'bottom-extra-large']}>
 						<FormGroup>
 							{isLoading ? (
 								<Spinner size="large" />
@@ -219,6 +229,11 @@ const UserItemRequestForm: FunctionComponent<UserItemRequestFormProps> = ({ hist
 							)}
 						</FormGroup>
 					</Spacer>
+					<Html
+						content={t(
+							'user-item-request-form/views/user-item-request-form___welk-materiaal-komt-in-aanmerking-voor-publicatie'
+						)}
+					/>
 				</Container>
 			</>
 		);

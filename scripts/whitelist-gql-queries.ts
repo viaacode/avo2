@@ -1,13 +1,17 @@
+// tslint:disable:no-console
 /**
  * This script runs over all files that match *.gql.ts and extracts the gql queries and whitelists them into the graphql database
  */
 import axios, { AxiosResponse } from 'axios';
-import * as fs from 'fs';
 import glob from 'glob';
 import _ from 'lodash';
 import * as path from 'path';
 
+const fs = require('fs-extra');
+
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
+const NOT_FOUND_WHITELIST_COLLECTION_ERROR = 'not-exists';
 
 if (!process.env.GRAPHQL_URL) {
 	console.error(
@@ -21,7 +25,7 @@ if (!process.env.GRAPHQL_SECRET) {
 }
 
 async function fetchPost(body: any) {
-	const url = `${process.env.GRAPHQL_URL}/v1/query`;
+	const url = (process.env.GRAPHQL_URL as string).replace('/v1/graphql', '/v1/query');
 	const response: AxiosResponse<any> = await axios(url, {
 		method: 'post',
 		headers: {
@@ -31,10 +35,7 @@ async function fetchPost(body: any) {
 	});
 	const errors = _.get(response, 'data.errors');
 	if (errors) {
-		console.error('Failed to insert event into the database', {
-			url,
-			errors,
-		});
+		throw new Error(`Failed to add whitelist to the database: ${JSON.stringify(errors)}`);
 	}
 	return response.data;
 }
@@ -70,7 +71,9 @@ function whitelistQueries(collectionName: string, collectionDescription: string,
 									`Extracting graphql queries with javascript template parameters isn't supported: ${name}`
 								);
 							}
-							queries[name] = query.replace(/^\t/gm, '').trim();
+							// Remove new lines and tabs
+							// Trim whitespace
+							queries[name] = query.replace(/[\t\r\n]+/gm, ' ').trim();
 						}
 					} while (matches);
 				} catch (err) {
@@ -88,7 +91,7 @@ function whitelistQueries(collectionName: string, collectionDescription: string,
 				});
 			} catch (err) {
 				// Ignore error if query collection doesn't exist
-				if (_.get(err, 'response.data.code') !== 'not-exists') {
+				if (_.get(err, 'response.data.code') !== NOT_FOUND_WHITELIST_COLLECTION_ERROR) {
 					throw err;
 				}
 			}
@@ -105,7 +108,7 @@ function whitelistQueries(collectionName: string, collectionDescription: string,
 				});
 			} catch (err) {
 				// Ignore error if query collection doesn't exist
-				if (_.get(err, 'response.data.code') !== 'not-exists') {
+				if (_.get(err, 'response.data.code') !== NOT_FOUND_WHITELIST_COLLECTION_ERROR) {
 					throw err;
 				}
 			}
@@ -120,7 +123,8 @@ function whitelistQueries(collectionName: string, collectionDescription: string,
 					definition: {
 						queries: _.map(queries, (query: string, name: string) => ({
 							name,
-							query: query.trim(),
+							// Remove query name
+							query: query.replace(/^(query|mutation)\s?[^({]+([({])/gm, '$1 $2'),
 						})),
 					},
 				},
@@ -136,19 +140,27 @@ function whitelistQueries(collectionName: string, collectionDescription: string,
 			});
 			console.log('[QUERY WHITELISTING]: Re-added collection to whitelist');
 
+			const outputFile = path.join(__dirname, 'client-whitelist.json');
+			await fs.writeFile(outputFile, JSON.stringify(queries, null, 2));
+
 			console.log(
 				`[QUERY WHITELISTING]: Whitelisted ${
 					Object.keys(queries).length
-				} queries in the graphql database`
+				} queries in the graphql database. Full list: ${outputFile}`
 			);
 		} catch (err) {
-			console.error('Failed to extract and upload graphql query whitelist', err);
+			console.error(
+				'Failed to extract and upload graphql query whitelist',
+				JSON.stringify(err)
+			);
 		}
 	});
 }
 
+// https://github.com/hasura/graphql-engine/issues/4138
 whitelistQueries(
-	'avo_client_queries',
+	'allowed-queries',
 	'All queries the avo2 client is allowed to execute',
 	/const ([^\s]+) = gql`([^`]+?)`/gm
 );
+// tslint:enable:no-console

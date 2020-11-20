@@ -154,12 +154,12 @@ export default class ResizablePanels extends Component<ResizablePanelsProps, Res
 
 			const nextPanelsSize = this.getNextPanelsSize(displacement);
 
-			this.setState({
-				...this.state,
+			this.setState((state) => ({
+				...state,
 				displacement,
 				initialPos: currentMousePosition,
 				panelsSize: nextPanelsSize,
-			});
+			}));
 			if (this.props.onResize) {
 				this.props.onResize(displacement);
 			}

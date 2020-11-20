@@ -24,7 +24,7 @@ export function renderSimpleDetailRows(
 	obj: any,
 	propAndTranslations: [string, string][]
 ): ReactElement[] {
-	return propAndTranslations.map(propAndTranslation => {
+	return propAndTranslations.map((propAndTranslation) => {
 		let value = get(obj, propAndTranslation[0]);
 		if (isBoolean(value)) {
 			value = value ? 'Ja' : 'Nee';
@@ -37,11 +37,9 @@ export function renderDateDetailRows(
 	obj: any,
 	propAndTranslations: [string, string][]
 ): ReactElement[] {
-	return propAndTranslations.map(propAndTranslation => {
-		return renderDetailRow(
-			obj[propAndTranslation[0]] ? formatDate(obj[propAndTranslation[0]]) : '-',
-			propAndTranslation[1]
-		);
+	return propAndTranslations.map((propAndTranslation) => {
+		const value = get(obj, propAndTranslation[0]);
+		return renderDetailRow(value ? formatDate(value) : '-', propAndTranslation[1]);
 	});
 }
 
@@ -49,7 +47,7 @@ export function renderMultiOptionDetailRows(
 	obj: any,
 	propAndTranslations: [string, string][]
 ): ReactElement[] {
-	return propAndTranslations.map(propAndTranslation => {
+	return propAndTranslations.map((propAndTranslation) => {
 		return renderDetailRow(
 			obj[propAndTranslation[0]] ? (
 				<TagList

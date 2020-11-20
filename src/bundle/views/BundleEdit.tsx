@@ -6,7 +6,7 @@ import CollectionOrBundleEdit from '../../collection/components/CollectionOrBund
 
 interface CollectionEditProps extends DefaultSecureRouteProps<{ id: string }> {}
 
-const BundleEdit: FunctionComponent<CollectionEditProps> = props => {
+const BundleEdit: FunctionComponent<CollectionEditProps> = (props) => {
 	return <CollectionOrBundleEdit {...props} type="bundle" />;
 };
 

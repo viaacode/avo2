@@ -90,7 +90,7 @@ export class PermissionGroupService {
 			return permissionGroups;
 		} catch (err) {
 			throw new CustomError('Failed to get all permissionGroups from database', err, {
-				query: 'GET_ALL_PERMISSIONS',
+				query: 'GET_ALL_PERMISSION_GROUPS',
 			});
 		}
 	}
@@ -140,7 +140,7 @@ export class PermissionGroupService {
 			const response = await dataService.mutate({
 				mutation: ADD_PERMISSIONS_TO_GROUP,
 				variables: {
-					objs: permissionIds.map(permissionId => ({
+					objs: permissionIds.map((permissionId) => ({
 						user_permission_id: permissionId,
 						user_permission_group_id: permissionGroupId,
 					})),

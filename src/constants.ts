@@ -51,7 +51,9 @@ export type RouteId =
 
 // Routes should be ordered from least specific, to most specific
 // So we can use this order to search for interactive tours in the correct order
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export const APP_PATH: { [routeId in RouteId]: RouteInfo } = {
+	/* eslint-enable @typescript-eslint/no-unused-vars */
 	LOGIN: {
 		route: `/${ROUTE_PARTS.login}`,
 		showInContentPicker: true,
@@ -104,12 +106,12 @@ export const APP_PATH: { [routeId in RouteId]: RouteInfo } = {
 	},
 	LOGGED_OUT_HOME: {
 		route: '/',
-		showInContentPicker: true,
+		showInContentPicker: false,
 		showForInteractiveTour: false,
 	},
 	LOGGED_IN_HOME: {
 		route: `/${ROUTE_PARTS.loggedInHome}`,
-		showInContentPicker: true,
+		showInContentPicker: false,
 		showForInteractiveTour: false,
 	},
 	ITEM_DETAIL: {
@@ -184,8 +186,8 @@ export const APP_PATH: { [routeId in RouteId]: RouteInfo } = {
 	},
 	SETTINGS: {
 		route: `/${ROUTE_PARTS.settings}`,
-		showInContentPicker: true,
-		showForInteractiveTour: true,
+		showInContentPicker: false,
+		showForInteractiveTour: false,
 	},
 	SETTINGS_TAB: {
 		route: `/${ROUTE_PARTS.settings}/:tabId`,
@@ -234,7 +236,9 @@ export const APP_PATH: { [routeId in RouteId]: RouteInfo } = {
 	},
 };
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export const CONTENT_TYPE_TO_ROUTE: { [contentType in Avo.Core.ContentType]: string } = {
+	/* eslint-enable @typescript-eslint/no-unused-vars */
 	video: APP_PATH.ITEM_DETAIL.route,
 	audio: APP_PATH.ITEM_DETAIL.route,
 	collectie: APP_PATH.COLLECTION_DETAIL.route,

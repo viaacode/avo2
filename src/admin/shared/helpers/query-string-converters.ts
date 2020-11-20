@@ -9,12 +9,15 @@ export const DateRangeParam = {
 		}
 		return JSON.stringify(value);
 	},
-	decode: (value: string | string[]): DateRange | undefined => {
+	decode: (value: string | (string | null)[] | null | undefined): DateRange | undefined => {
 		try {
 			if (Array.isArray(value)) {
 				if (value.length) {
-					return JSON.parse(value[0]);
+					return JSON.parse(value[0] as string);
 				}
+				return;
+			}
+			if (!value) {
 				return;
 			}
 			return JSON.parse(value);
@@ -29,17 +32,17 @@ export const CheckboxListParam = {
 		if (!value) {
 			return;
 		}
-		return value.join(',');
+		return value.join('~');
 	},
-	decode: (value: string | string[]): string[] | undefined => {
+	decode: (value: string | (string | null)[] | null | undefined): string[] | undefined => {
 		try {
 			if (!value) {
 				return [];
 			}
 			if (isArray(value)) {
-				return value;
+				return value as string[];
 			}
-			return value.split(',');
+			return value.split('~');
 		} catch (err) {
 			return;
 		}

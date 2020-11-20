@@ -1,10 +1,11 @@
 import { createBrowserHistory } from 'history';
-import { RouteComponentProps } from 'react-router';
+
+import { NavigationParams } from '../components/Navigation/Navigation';
 
 /**
  * This is to mock out the dependencies for react router
  */
-export function getMockRouterProps<P>(data: P) {
+export function getMockRouterProps(data: any) {
 	const location = {
 		hash: '',
 		key: '',
@@ -13,7 +14,7 @@ export function getMockRouterProps<P>(data: P) {
 		state: {},
 	};
 
-	const props: RouteComponentProps<P> = {
+	const props: NavigationParams = {
 		location,
 		match: {
 			isExact: true,
@@ -23,6 +24,10 @@ export function getMockRouterProps<P>(data: P) {
 		},
 		history: createBrowserHistory(),
 		staticContext: {},
+		loginState: {} as any,
+		loginStateLoading: false,
+		loginStateError: false,
+		getLoginState: () => ({} as any),
 	};
 
 	return props;

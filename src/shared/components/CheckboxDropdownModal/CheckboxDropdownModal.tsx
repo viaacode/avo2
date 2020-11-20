@@ -1,5 +1,5 @@
 import classnames from 'classnames';
-import { clone, compact, fromPairs } from 'lodash-es';
+import { clone, compact, fromPairs, take } from 'lodash-es';
 import React, { FunctionComponent, MouseEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,10 +21,13 @@ import {
 	ModalFooterRight,
 	Spacer,
 	TagList,
+	TextInput,
 	Toolbar,
 	ToolbarItem,
 	ToolbarRight,
 } from '@viaa/avo2-components';
+
+import { isMobileWidth } from '../../helpers';
 
 import './CheckboxDropdownModal.scss';
 
@@ -50,16 +53,25 @@ export interface CheckboxDropdownModalProps {
 	label: string;
 	id: string;
 	options: CheckboxOption[];
+	showMaxOptions?: number;
 	disabled?: boolean;
+	// Show selected values when dropdown or modal are closed
+	showSelectedValuesOnCollapsed?: boolean;
+	showSearch?: boolean;
 	onChange: (checkedOptions: string[], id: string) => void;
+	onSearch?: (aggId: string) => void;
 }
 
 export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps> = ({
 	label,
 	id,
 	options,
+	showMaxOptions,
 	disabled,
+	showSelectedValuesOnCollapsed = true,
+	showSearch = true,
 	onChange,
+	onSearch,
 }) => {
 	const [t] = useTranslation();
 
@@ -71,6 +83,7 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 	// State
 	const [checkedStates, setCheckedStates] = useState(optionsFromPairs);
 	const [isOpen, setIsOpen] = useState<boolean>(false);
+	const [searchKeyword, setSearchKeyword] = useState<string>('');
 
 	// Methods
 	const getSelectedTags = (): Tag[] =>
@@ -87,7 +100,7 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 
 	const getSelectedFilterIds = (currentCheckedStates: CheckedState) =>
 		compact(
-			Object.keys(currentCheckedStates).map(key => (currentCheckedStates[key] ? key : null))
+			Object.keys(currentCheckedStates).map((key) => (currentCheckedStates[key] ? key : null))
 		);
 
 	const resetInternalCheckboxStates = () => setCheckedStates(optionsFromPairs);
@@ -98,18 +111,22 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 		await closeDropdownOrModal();
 	};
 
-	const handleCheckboxToggled = async (newCheckedState: boolean, toggledCheckboxId: string) =>
+	const handleCheckboxToggled = async (newCheckedState: boolean, toggledCheckboxId: string) => {
 		setCheckedStates({
 			...checkedStates,
 			[toggledCheckboxId]: newCheckedState,
 		});
+	};
 
 	const openDropdownOrModal = async () => {
 		await resetInternalCheckboxStates();
 		setIsOpen(true);
 	};
 
-	const closeDropdownOrModal = () => setIsOpen(false);
+	const closeDropdownOrModal = () => {
+		setIsOpen(false);
+		setSearchKeyword('');
+	};
 
 	const removeFilter = (tagId: string | number, evt: MouseEvent) => {
 		evt.stopPropagation();
@@ -145,7 +162,13 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 				onClose={closeDropdownOrModal}
 			>
 				<DropdownButton>
-					{renderDropdownButton(label, isOpen, getSelectedTags(), removeFilter)}
+					{renderDropdownButton(
+						label,
+						isOpen,
+						getSelectedTags(),
+						removeFilter,
+						showSelectedValuesOnCollapsed
+					)}
 				</DropdownButton>
 				<DropdownContent>
 					<Spacer>
@@ -192,21 +215,30 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 	};
 
 	const renderModalControl = () => {
-		const oneThird = Math.ceil(options.length / 3);
-		const firstColumnOptions = options.slice(0, oneThird);
-		const secondColumnOptions = options.slice(oneThird, oneThird * 2);
-		const thirdColumnOptions = options.slice(oneThird * 2);
-
-		// TODO: add search in checkbox modal components
-		// private getFilterOptions(searchTerm: string, propertyName: string): Promise<Avo.Search.OptionProp[]> {
-		// 	const searchResponse: Avo.Search.Search = await executeSearch();
-		// 	return searchResponse.aggregations[propertyName];
-		// }
+		const filteredOptions = take(
+			options.filter((option: CheckboxOption) =>
+				(option.label || '')
+					.replace(/ /g, '')
+					.toLowerCase()
+					.includes(searchKeyword.replace(/ /g, '').toLowerCase())
+			),
+			showMaxOptions || Number.POSITIVE_INFINITY // Limit number of items so the modal doesn't scroll on desktop
+		);
+		const oneThird = Math.ceil(filteredOptions.length / 3);
+		const firstColumnOptions = filteredOptions.slice(0, oneThird);
+		const secondColumnOptions = filteredOptions.slice(oneThird, oneThird * 2);
+		const thirdColumnOptions = filteredOptions.slice(oneThird * 2);
 
 		return (
 			<>
 				<div className="c-checkbox-dropdown__trigger" onClick={openDropdownOrModal}>
-					{renderDropdownButton(label, isOpen, getSelectedTags(), removeFilter)}
+					{renderDropdownButton(
+						label,
+						isOpen,
+						getSelectedTags(),
+						removeFilter,
+						showSelectedValuesOnCollapsed
+					)}
 				</div>
 				<Modal
 					isOpen={isOpen}
@@ -215,29 +247,58 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 					onClose={closeDropdownOrModal}
 					scrollable
 				>
-					{/* TODO: add search in checkbox modal components */}
-					{/*<ModalHeaderRight>*/}
-					{/*	<TextInput*/}
-					{/*		placeholder={t(*/}
-					{/*			'shared/components/checkbox-dropdown-modal/checkbox-dropdown-modal___zoeken'*/}
-					{/*		)}*/}
-					{/*		icon="search"*/}
-					{/*	/>*/}
-					{/*</ModalHeaderRight>*/}
 					<ModalBody>
-						<Spacer>
+						{showSearch && (
+							<>
+								<TextInput
+									placeholder={t(
+										'shared/components/checkbox-dropdown-modal/checkbox-dropdown-modal___zoeken'
+									)}
+									icon="search"
+									value={searchKeyword}
+									onChange={(value) => {
+										setSearchKeyword(value);
+
+										if (onSearch) {
+											onSearch(id);
+										}
+									}}
+								/>
+								{!!options.filter(
+									(option: CheckboxOption) => checkedStates[option.id]
+								).length && (
+									<div className="c-checkbox-dropdown__checked">
+										<TagList
+											tags={options.filter(
+												(option: CheckboxOption) => checkedStates[option.id]
+											)}
+											swatches={false}
+											closable={true}
+											onTagClosed={(id) =>
+												handleCheckboxToggled(false, id.toString())
+											}
+										/>
+									</div>
+								)}
+							</>
+						)}
+						<Spacer className="c-checkbox-dropdown__list">
 							<Form>
-								<Grid>
-									<Column size="2-4">
-										{renderCheckboxGroup(firstColumnOptions)}
-									</Column>
-									<Column size="2-4">
-										{renderCheckboxGroup(secondColumnOptions)}
-									</Column>
-									<Column size="2-4">
-										{renderCheckboxGroup(thirdColumnOptions)}
-									</Column>
-								</Grid>
+								{isMobileWidth() ? (
+									renderCheckboxGroup(take(filteredOptions, 14))
+								) : (
+									<Grid>
+										<Column size="2-4">
+											{renderCheckboxGroup(firstColumnOptions)}
+										</Column>
+										<Column size="2-4">
+											{renderCheckboxGroup(secondColumnOptions)}
+										</Column>
+										<Column size="2-4">
+											{renderCheckboxGroup(thirdColumnOptions)}
+										</Column>
+									</Grid>
+								)}
 							</Form>
 						</Spacer>
 					</ModalBody>
@@ -273,24 +334,29 @@ export const CheckboxDropdownModal: FunctionComponent<CheckboxDropdownModalProps
 		);
 	};
 
-	return (
-		<div className={classnames({ 'u-opacity-50 u-disable-click': disabled })}>
-			{options.length <= 7 ? renderCheckboxControl() : renderModalControl()}
-		</div>
-	);
+	if (disabled) {
+		return (
+			<div className={classnames({ 'u-opacity-50 u-disable-click': disabled })}>
+				{options.length <= 7 ? renderCheckboxControl() : renderModalControl()}
+			</div>
+		);
+	}
+
+	return options.length <= 7 ? renderCheckboxControl() : renderModalControl();
 };
 
 export const renderDropdownButton = (
 	label: string,
 	isOpen: boolean,
 	selectedTags: { label: string; id: string | number }[],
-	removeFilter: (tagId: string | number, clickEvent: MouseEvent) => void
+	removeFilter: (tagId: string | number, clickEvent: MouseEvent) => void,
+	showSelectedValuesOnCollapsed: boolean = true
 ) => {
 	return (
 		<Button autoHeight className="c-checkbox-dropdown-modal__trigger" type="secondary">
 			<div className="c-button__content">
 				<div className="c-button__label">{label}</div>
-				{!!selectedTags.length && (
+				{!!selectedTags.length && showSelectedValuesOnCollapsed && (
 					<TagList
 						tags={selectedTags}
 						swatches={false}

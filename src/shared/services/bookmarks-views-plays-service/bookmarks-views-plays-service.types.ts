@@ -1,3 +1,5 @@
+import { EnglishContentType } from '@viaa/avo2-components';
+
 export interface BookmarkRequestInfo {
 	type: EventContentTypeSimplified;
 	uuid: string;
@@ -11,10 +13,10 @@ export interface BookmarkInfo {
 	createdAt: number;
 	contentId: string;
 	contentLinkId: string;
-	contentType: EventContentType;
+	contentType: EnglishContentType;
 	contentTitle: string;
 	contentThumbnailPath: string | null | undefined;
-	contentCreatedAt: number;
+	contentCreatedAt: number | null;
 	contentViews: number;
 }
 
@@ -68,7 +70,6 @@ export interface AppCollectionBookmark {
 }
 
 export type EventAction = 'bookmark' | 'unbookmark' | 'view' | 'play';
-export type EventInitAction = 'viewInit' | 'playInit';
-export type EventActionExtended = EventAction | EventInitAction;
+export type QueryType = 'query' | 'get' | 'init' | 'increment';
 export type EventContentTypeSimplified = 'item' | 'collection';
 export type EventContentType = EventContentTypeSimplified | 'bundle';

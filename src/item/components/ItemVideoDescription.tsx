@@ -10,7 +10,7 @@ import React, {
 	useState,
 } from 'react';
 import { Trans } from 'react-i18next';
-import { RouteComponentProps, withRouter } from 'react-router-dom';
+import { Link, RouteComponentProps, withRouter } from 'react-router-dom';
 import { Scrollbar } from 'react-scrollbars-custom';
 import { compose } from 'redux';
 
@@ -28,7 +28,7 @@ import { Color } from '../../admin/shared/types';
 import { FlowPlayerWrapper } from '../../shared/components';
 import { CuePoints } from '../../shared/components/FlowPlayerWrapper/FlowPlayerWrapper';
 import Html from '../../shared/components/Html/Html';
-import { parseDuration } from '../../shared/helpers';
+import { parseDuration, stripHtml } from '../../shared/helpers';
 import withUser from '../../shared/hocs/withUser';
 
 import './ItemVideoDescription.scss';
@@ -47,7 +47,8 @@ interface ItemVideoDescriptionProps {
 	seekTime?: number;
 	canPlay?: boolean; // If video is behind modal or inside a closed modal this value will be false
 	verticalLayout?: boolean;
-	onTitleClicked?: () => void;
+	titleLink?: string;
+	onPlay?: () => void;
 }
 
 const DEFAULT_VIDEO_HEIGHT = 421;
@@ -65,8 +66,9 @@ const ItemVideoDescription: FunctionComponent<ItemVideoDescriptionProps & RouteC
 	seekTime = 0,
 	canPlay = true,
 	verticalLayout = false,
-	onTitleClicked,
+	titleLink,
 	location,
+	onPlay,
 }) => {
 	const TIMESTAMP_REGEX = /([0-9]{2}:[0-9]{2}:[0-9]{2})/g;
 
@@ -134,7 +136,7 @@ const ItemVideoDescription: FunctionComponent<ItemVideoDescriptionProps & RouteC
 	const formatTimestamps = (description: string = ''): ReactNode => {
 		const formattedDescription = description
 			.replace(/[\n\r]+/, '')
-			.replace(TIMESTAMP_REGEX, match => {
+			.replace(TIMESTAMP_REGEX, (match) => {
 				return `<span class="c-description-timecode">${match}</span>`;
 			});
 
@@ -150,22 +152,38 @@ const ItemVideoDescription: FunctionComponent<ItemVideoDescriptionProps & RouteC
 				canPlay={canPlay}
 				cuePoints={cuePoints}
 				seekTime={time}
+				onPlay={onPlay}
 			/>
 		);
+	};
+
+	const renderTitle = () => {
+		const titleElement = (
+			<BlockHeading
+				type="h3"
+				className={titleLink ? 'u-clickable' : ''}
+				color={titleLink ? Color.TealBright : undefined}
+			>
+				{title}
+			</BlockHeading>
+		);
+
+		if (titleLink) {
+			return (
+				<Link to={titleLink} className="a-link__no-styles">
+					{titleElement}
+				</Link>
+			);
+		} 
+			return titleElement;
+		
 	};
 
 	const renderDescription = () => {
 		return (
 			<>
 				{showTitle ? (
-					<BlockHeading
-						type="h3"
-						className={onTitleClicked ? 'u-clickable' : ''}
-						onClick={onTitleClicked || (() => {})}
-						color={onTitleClicked ? Color.TealBright : undefined}
-					>
-						{title}
-					</BlockHeading>
+					renderTitle()
 				) : (
 					<BlockHeading type="h4">
 						<Trans i18nKey="item/components/item-video-description___beschrijving">
@@ -180,6 +198,20 @@ const ItemVideoDescription: FunctionComponent<ItemVideoDescriptionProps & RouteC
 
 	const renderDescriptionWrapper = () => {
 		if (collapseDescription) {
+			if (verticalLayout) {
+				if (stripHtml(convertToHtml(description)).length < 444) {
+					// The description is short enough so we don't need to collapse it, and we can make the height auto
+					return renderDescription();
+				}
+				// The height is too large, we need to wrap the description in a collapsable container
+				return (
+					<ExpandableContainer collapsedHeight={300 - 36 - 18}>
+						{renderDescription()}
+					</ExpandableContainer>
+				);
+			}
+			// The description is rendered next to the video
+			// We need to make the height of the description collapsable container the same as the video height
 			return (
 				<Scrollbar
 					style={{

@@ -13,7 +13,7 @@ interface AlignSelectProps {
 const AlignSelect: FunctionComponent<AlignSelectProps> = ({ onChange, options, value }) => {
 	return (
 		<ButtonGroup>
-			{options.map(option => (
+			{options.map((option) => (
 				<Button
 					key={`heading-block-align-${option.value}`}
 					active={value === option.value}

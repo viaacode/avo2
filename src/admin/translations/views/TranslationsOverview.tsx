@@ -1,9 +1,9 @@
-import { flatten, fromPairs, get, groupBy, map } from 'lodash-es';
-import React, { FunctionComponent, useEffect, useState } from 'react';
+import { flatten, fromPairs, get, groupBy, isNil, map } from 'lodash-es';
+import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 
-import { Button, Container, KeyValueEditor } from '@viaa/avo2-components';
+import { Button, KeyValueEditor } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
 import { GENERATE_SITE_TITLE } from '../../../constants';
@@ -21,23 +21,26 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 	const [initialTranslations, setInitialTranslations] = useState<Translation[]>([]);
 	const [translations, setTranslations] = useState<Translation[]>([]);
 
-	useEffect(() => {
+	const getTranslations = useCallback(async () => {
 		fetchTranslations()
 			.then((translationsState: TranslationsState[]) => {
 				const translationRows = convertTranslationsToData(translationsState);
 				setInitialTranslations(translationRows);
 				setTranslations(translationRows);
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error(new CustomError('Failed to fetch translations', err));
 				ToastService.danger(
 					t(
 						'admin/translations/views/translations-overview___het-ophalen-van-de-vertalingen-is-mislukt'
-					),
-					false
+					)
 				);
 			});
 	}, [t]);
+
+	useEffect(() => {
+		getTranslations();
+	}, [getTranslations]);
 
 	const onChangeTranslations = (updatedTranslations: Translation[]) => {
 		setTranslations(updatedTranslations);
@@ -47,33 +50,60 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 		// convert translations to db format and save translations
 		const promises: any = [];
 
-		convertDataToTranslations(translations).forEach((context: any) => {
+		const freshTranslations = convertTranslationsToData(await fetchTranslations());
+
+		const updatedTranslations = freshTranslations.map((freshTranslation: Translation): [
+			string,
+			string
+		] => {
+			const initialTranslation = initialTranslations.find(
+				(trans) => trans[0] === freshTranslation[0]
+			);
+			const currentTranslation = translations.find(
+				(trans) => trans[0] === freshTranslation[0]
+			);
+
+			if (isNil(currentTranslation)) {
+				// This translation has been added to the database but didn't exist yet when the page was loaded
+				return freshTranslation;
+			}
+
+			if (
+				!isNil(initialTranslation) &&
+				!isNil(currentTranslation) &&
+				initialTranslation[1] !== currentTranslation[1]
+			) {
+				// This translation has changed since the page was loaded
+				return currentTranslation;
+			}
+
+			// This translation has not changed, we write the fresh value from the database back to the database
+			return freshTranslation;
+		});
+
+		convertDataToTranslations(updatedTranslations).forEach((context: any) => {
 			promises.push(updateTranslations(context.name, context));
 		});
 
 		try {
 			await Promise.all(promises);
 
-			setInitialTranslations(translations);
+			await getTranslations();
 
 			ToastService.success(
-				t(
-					'admin/translations/views/translations-overview___de-vertalingen-zijn-opgeslagen'
-				),
-				false
+				t('admin/translations/views/translations-overview___de-vertalingen-zijn-opgeslagen')
 			);
 		} catch (err) {
 			console.error(new CustomError('Failed to save translations', err));
 			ToastService.danger(
 				t(
 					'admin/translations/views/translations-overview___het-opslaan-van-de-vertalingen-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
 
-	const convertTranslationsToData = (translations: TranslationsState[]): [string, string][] => {
+	const convertTranslationsToData = (translations: TranslationsState[]): Translation[] => {
 		// convert translations to state format
 		return flatten(
 			translations.map((context: TranslationsState) => {
@@ -81,10 +111,12 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 				const translationsArray: Translation[] = Object.entries(get(context, 'value'));
 
 				// add context to translations id
-				return translationsArray.map(item => [
-					`${get(context, 'name').replace('translations-', '')}/${item[0]}`,
-					item[1],
-				]);
+				return translationsArray.map(
+					(item: Translation): Translation => [
+						`${get(context, 'name').replace('translations-', '')}/${item[0]}`,
+						item[1],
+					]
+				);
 			})
 		);
 	};
@@ -95,14 +127,14 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 	};
 
 	const convertDataToTranslations = (data: Translation[]) => {
-		const translationsPerContext = groupBy(data, dataItem => {
+		const translationsPerContext = groupBy(data, (dataItem) => {
 			return splitOnFirstSlash(dataItem[0])[0];
 		});
 
 		return map(translationsPerContext, (translations: Translation, context: string) => ({
 			name: `translations-${context}`,
 			value: fromPairs(
-				translations.map(translation => [
+				translations.map((translation) => [
 					splitOnFirstSlash(translation[0])[1],
 					translation[1],
 				])
@@ -111,7 +143,10 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 	};
 
 	return (
-		<AdminLayout pageTitle={t('admin/translations/views/translations-overview___vertalingen')}>
+		<AdminLayout
+			pageTitle={t('admin/translations/views/translations-overview___vertalingen')}
+			size="full-width"
+		>
 			<AdminLayoutTopBarRight>
 				<Button label="Opslaan" onClick={onSaveTranslations} />
 			</AdminLayoutTopBarRight>
@@ -131,17 +166,13 @@ const TranslationsOverview: FunctionComponent<TranslationsOverviewProps> = () =>
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal" size="full-width">
-						{!!translations.length && (
-							<KeyValueEditor
-								initialData={initialTranslations}
-								data={translations}
-								onChange={onChangeTranslations}
-							/>
-						)}
-					</Container>
-				</Container>
+				{!!translations.length && (
+					<KeyValueEditor
+						initialData={initialTranslations}
+						data={translations}
+						onChange={onChangeTranslations}
+					/>
+				)}
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

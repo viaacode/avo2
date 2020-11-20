@@ -1,5 +1,5 @@
 import { get } from 'lodash-es';
-import { Tickets } from 'node-zendesk';
+import { Requests } from 'node-zendesk';
 import React, { FunctionComponent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,6 @@ import {
 	Modal,
 	ModalBody,
 	ModalFooterRight,
-	RadioButton,
 	RadioButtonGroup,
 	Spacer,
 	Spinner,
@@ -21,7 +20,10 @@ import {
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { getFullName } from '../../../shared/helpers/formatters';
 import { ToastService, ZendeskService } from '../../../shared/services';
+import { trackEvents } from '../../../shared/services/event-logging-service';
 import i18n from '../../../shared/translations/i18n';
 
 interface ReportItemModalProps {
@@ -52,7 +54,7 @@ const ReportItemModal: FunctionComponent<ReportItemModalProps> = ({
 	const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
 	const reportItem = async () => {
-		let ticket: Tickets.CreateModel | undefined;
+		let ticket: Requests.CreateModel | undefined;
 		try {
 			if (!reason) {
 				return;
@@ -60,38 +62,51 @@ const ReportItemModal: FunctionComponent<ReportItemModalProps> = ({
 			setIsProcessing(true);
 			const body = {
 				extraDetails,
-				firstName: get(user, 'first_name'),
-				lastName: get(user, 'last_name'),
-				email: get(user, 'mail'),
 				reason: GET_RADIO_BUTTON_LABELS()[reason],
+				pageUrl: window.location.href,
 			};
 			ticket = {
 				comment: {
 					url: window.location.href,
 					body: JSON.stringify(body),
 					html_body: `<dl>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___voornaam">Voornaam</Trans></dt><dd>${
-		body.firstName
-  }</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___achternaam">Achternaam</Trans></dt><dd>${
-		body.lastName
-  }</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___email">Email</Trans></dt><dd>${
-		body.email
-  }</dd>
   <dt><Trans i18nKey="item/components/modals/report-item-modal___reden-van-rapporteren">Reden van rapporteren</Trans></dt><dd>${
 		GET_RADIO_BUTTON_LABELS()[reason]
   }</dd>
-  <dt><Trans i18nKey="item/components/modals/report-item-modal___extra-toelichting">Extra toelichting</Trans></dt><dd>${extraDetails ||
-		t('item/components/modals/report-item-modal___geen-extra-toelichting-ingegeven')}</dd>
+  <dt>${t('item/components/modals/report-item-modal___extra-toelichting')}</dt><dd>${
+						extraDetails ||
+						t(
+							'item/components/modals/report-item-modal___geen-extra-toelichting-ingegeven'
+						)
+					}</dd>
+  <dt>${t('item/components/modals/report-item-modal___pagina-url')}</dt><dd>${
+						window.location.href
+					}</dd>
 </dl>`,
 					public: false,
 				},
 				subject: t(
 					'item/components/modals/report-item-modal___media-item-gerapporteerd-door-gebruiker-op-av-o-2'
 				),
+				requester: {
+					email: get(user, 'mail'),
+					name: getFullName(user as any, true, false) || '',
+				},
 			};
-			await ZendeskService.createTicket(ticket);
+			await ZendeskService.createTicket(ticket as Requests.CreateModel);
+
+			trackEvents(
+				{
+					object: externalId,
+					object_type: 'item',
+					message: `${getProfileName(user)} heeft een item gerapporteerd wegens ${
+						GET_RADIO_BUTTON_LABELS()[reason]
+					}`,
+					action: 'report',
+				},
+				user
+			);
+
 			onClose();
 			ToastService.success(
 				t('item/components/modals/report-item-modal___het-item-is-gerapporteerd')
@@ -129,29 +144,24 @@ const ReportItemModal: FunctionComponent<ReportItemModalProps> = ({
 								label={t('item/components/modals/report-item-modal___reden')}
 								required
 							>
-								<RadioButtonGroup>
-									<RadioButton
-										label={GET_RADIO_BUTTON_LABELS()['broken']}
-										name="broken"
-										value="broken"
-										checked={reason === 'broken'}
-										onChange={() => setReason('broken')}
-									/>
-									<RadioButton
-										label={GET_RADIO_BUTTON_LABELS()['inappropriate']}
-										name="inappropriate"
-										value="inappropriate"
-										checked={reason === 'inappropriate'}
-										onChange={() => setReason('inappropriate')}
-									/>
-									<RadioButton
-										label={GET_RADIO_BUTTON_LABELS()['copyright']}
-										name="copyright"
-										value="copyright"
-										checked={reason === 'copyright'}
-										onChange={() => setReason('copyright')}
-									/>
-								</RadioButtonGroup>
+								<RadioButtonGroup
+									options={[
+										{
+											label: GET_RADIO_BUTTON_LABELS()['broken'],
+											value: 'broken',
+										},
+										{
+											label: GET_RADIO_BUTTON_LABELS()['inappropriate'],
+											value: 'inappropriate',
+										},
+										{
+											label: GET_RADIO_BUTTON_LABELS()['copyright'],
+											value: 'copyright',
+										},
+									]}
+									value={reason}
+									onChange={(reason: string) => setReason(reason as Reason)}
+								/>
 							</FormGroup>
 							<Spacer margin="top-large">
 								<FormGroup

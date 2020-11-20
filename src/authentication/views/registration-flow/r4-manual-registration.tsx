@@ -1,4 +1,4 @@
-import { Tickets } from 'node-zendesk';
+import { Requests } from 'node-zendesk';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
@@ -29,7 +29,7 @@ import { ROUTE_PARTS } from '../../../shared/constants';
 import { CustomError } from '../../../shared/helpers';
 import { ToastService, ZendeskService } from '../../../shared/services';
 import { fetchEducationLevels } from '../../../shared/services/education-levels-service';
-import { redirectToClientPage } from '../../helpers/redirects';
+import { trackEvents } from '../../../shared/services/event-logging-service';
 
 import './r4-manual-registration.scss';
 
@@ -132,7 +132,7 @@ const ManualRegistration: FunctionComponent<ManualRegistrationProps> = ({ histor
 	};
 
 	const onSend = async () => {
-		let ticket: Tickets.CreateModel | undefined;
+		let ticket: Requests.CreateModel | undefined;
 		try {
 			const errors = getValidationErrors();
 
@@ -142,7 +142,7 @@ const ManualRegistration: FunctionComponent<ManualRegistrationProps> = ({ histor
 			}
 
 			const parsedEducationLevels = selectedEducationLevels
-				.map(selectedEducationLevel => selectedEducationLevel.label)
+				.map((selectedEducationLevel) => selectedEducationLevel.label)
 				.join(', ');
 
 			// create zendesk ticket
@@ -150,30 +150,46 @@ const ManualRegistration: FunctionComponent<ManualRegistrationProps> = ({ histor
 				comment: {
 					url: window.location.href,
 					body: JSON.stringify({
-						firstName,
-						lastName,
-						email,
 						organization,
 						profession,
 						reason,
 						educationLevels: selectedEducationLevels,
 					}),
 					html_body: `<dl>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___voornaam">Voornaam</Trans></dt><dd>${firstName}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___achternaam">Achternaam</Trans></dt><dd>${lastName}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___email">Email</Trans></dt><dd>${email}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___school-of-organisatie">School of organisatie</Trans></dt><dd>${organization}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___functie-of-beroep">Functie of beroep</Trans></dt><dd>${profession}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___onderwijsniveaus">Onderwijsniveau's</Trans></dt><dd>${parsedEducationLevels}</dd>
-  <dt><Trans i18nKey="authentication/views/registration-flow/r-4-manual-registration___reden-voor-aanvraag">Reden voor aanvraag</Trans></dt><dd>${reason}</dd>
-</dl>`,
+  <dt>${t(
+		'authentication/views/registration-flow/r-4-manual-registration___school-of-organisatie'
+  )}</dt><dd>${organization}</dd>
+  <dt>${t(
+		'authentication/views/registration-flow/r-4-manual-registration___functie-of-beroep'
+  )}</dt><dd>${profession}</dd>
+  <dt>${t(
+		'authentication/views/registration-flow/r-4-manual-registration___onderwijsniveaus'
+  )}</dt><dd>${parsedEducationLevels}</dd>
+  <dt>${t(
+		'authentication/views/registration-flow/r-4-manual-registration___reden-voor-aanvraag'
+  )}</dt><dd>${reason}</dd>`,
 					public: false,
 				},
 				subject: t(
 					'authentication/views/registration-flow/r-4-manual-registration___manuele-aanvraag-account-op-av-o'
 				),
+				requester: {
+					email,
+					name: `${firstName} ${lastName}`,
+				},
 			};
 			await ZendeskService.createTicket(ticket);
+
+			trackEvents(
+				{
+					object: '',
+					object_type: 'account',
+					message: `${firstName} ${lastName} heeft manueel een account aangevraagd via zendesk`,
+					action: 'request',
+				},
+				null
+			);
+
 			ToastService.success(
 				t(
 					'authentication/views/registration-flow/r-4-manual-registration___je-aanvraag-is-verstuurt'
@@ -203,7 +219,7 @@ const ManualRegistration: FunctionComponent<ManualRegistrationProps> = ({ histor
 				<Spacer margin="bottom-large">
 					<Button
 						type="secondary"
-						onClick={() => redirectToClientPage(APP_PATH.STAMBOEK.route, history)}
+						onClick={history.goBack}
 						icon="arrow-left"
 						title={t(
 							'authentication/views/registration-flow/r-4-manual-registration___ga-terug-naar-de-stamboek-pagina'
@@ -325,10 +341,10 @@ const ManualRegistration: FunctionComponent<ManualRegistrationProps> = ({ histor
 										<a
 											href="//meemoo.be/nl/privacybeleid"
 											target="_blank"
-											rel="noopener noreferrer"
 											title={t(
 												'authentication/views/registration-flow/r-3-stamboek___bekijk-de-privacy-voorwaarden'
 											)}
+											rel="noopener noreferrer"
 										>
 											privacyverklaring
 										</a>

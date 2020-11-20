@@ -1,6 +1,6 @@
 import { get } from 'lodash-es';
 import React, { FunctionComponent } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 import { RouteComponentProps } from 'react-router';
 
@@ -10,25 +10,30 @@ import {
 	Button,
 	Column,
 	Container,
+	Flex,
 	Form,
 	FormGroup,
 	Grid,
 	IconName,
 	Spacer,
+	Spinner,
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
+import { SpecialUserGroup } from '../../admin/user-groups/user-group.const';
 import { hasIdpLinked } from '../../authentication/helpers/get-profile-info';
 import {
+	redirectToExternalPage,
 	redirectToServerLinkAccount,
 	redirectToServerUnlinkAccount,
 } from '../../authentication/helpers/redirects';
 import { GENERATE_SITE_TITLE } from '../../constants';
+import { ErrorView } from '../../error/views';
+import Html from '../../shared/components/Html/Html';
 import { getEnv } from '../../shared/helpers';
 
-// TODO replace this with a call to a proxy server route that forwards to the ssum page
-// with the user already logged in and a redirect url back to this webpage after the user saves their changes
-const ssumAccountEditPage = getEnv('SSUM_ACCOUNT_EDIT_URL');
+// const ssumAccountEditPage = getEnv('SSUM_ACCOUNT_EDIT_URL') as string;
+const ssumPasswordEditPage = getEnv('SSUM_PASSWORD_EDIT_URL') as string;
 
 export interface AccountProps extends RouteComponentProps {
 	user: Avo.User.User;
@@ -36,6 +41,8 @@ export interface AccountProps extends RouteComponentProps {
 
 const Account: FunctionComponent<AccountProps> = ({ location, user }) => {
 	const [t] = useTranslation();
+
+	const isPupil = get(user, 'profile.userGroupIds[0]') === SpecialUserGroup.Pupil;
 
 	const renderIdpLinkControls = (idpType: Avo.Auth.IdpType) => {
 		if (hasIdpLinked(user, idpType)) {
@@ -86,6 +93,27 @@ const Account: FunctionComponent<AccountProps> = ({ location, user }) => {
 		);
 	};
 
+	if (!user) {
+		return (
+			<Flex center>
+				<Spinner size="large" />
+			</Flex>
+		);
+	}
+
+	if (
+		isPupil &&
+		!get(user, 'idpmaps', []).find((idpMap: Avo.Auth.IdpType) => idpMap === 'HETARCHIEF')
+	) {
+		return (
+			<ErrorView
+				message={t(
+					'settings/components/account___je-hebt-geen-toegang-tot-de-account-pagina'
+				)}
+				icon="lock"
+			/>
+		);
+	}
 	return (
 		<>
 			<MetaTags>
@@ -106,58 +134,72 @@ const Account: FunctionComponent<AccountProps> = ({ location, user }) => {
 							<Form type="standard">
 								<Form type="standard">
 									<BlockHeading type="h3">
-										<Trans i18nKey="settings/components/account___account">
-											Account
-										</Trans>
+										{t('settings/components/account___account')}
 									</BlockHeading>
-									<FormGroup label={t('settings/components/account___voornaam')}>
-										<span>{get(user, 'first_name')}</span>
-									</FormGroup>
-									<FormGroup
-										label={t('settings/components/account___achternaam')}
-									>
-										<span>{get(user, 'last_name')}</span>
-									</FormGroup>
 									<FormGroup label={t('settings/components/account___email')}>
 										<span>{get(user, 'mail')}</span>
 									</FormGroup>
-									<Spacer margin="top-large">
-										<Alert type="info">
-											<span>
-												<h4 className="c-h4">
-													<Trans i18nKey="settings/components/account___viaa-identiteitsmanagement-systeem">
-														VIAA identiteitsmanagement systeem
-													</Trans>
-												</h4>
-												<Trans i18nKey="settings/components/account___beheerd-in-een-centraal-identiteitsmanagementsysteem">
-													Jouw account wordt beheerd in een centraal
-													identiteitsmanagementsysteem dat je toelaat om
-													met dezelfde gegevens op meerdere VIAA-websites
-													en applicaties in te loggen. <br /> Wijzigingen
-													aan deze gegevens worden dus doorgevoerd in al
-													deze websites en tools.
-												</Trans>
-												<br />
-												<a href={ssumAccountEditPage}>
-													<Trans i18nKey="settings/components/account___beheer-je-account-gegevens">
-														Beheer je account gegevens
-													</Trans>
-												</a>
-											</span>
-										</Alert>
+									{/* TODO re-enable when summ allows you to change your email address */}
+									{/*<Spacer margin="bottom">*/}
+									{/*	<Button*/}
+									{/*		type="secondary"*/}
+									{/*		onClick={() =>*/}
+									{/*			redirectToExternalPage(ssumAccountEditPage, null)*/}
+									{/*		}*/}
+									{/*		label={t(*/}
+									{/*			'settings/components/account___wijzig-accountgegevens'*/}
+									{/*		)}*/}
+									{/*	/>*/}
+									{/*</Spacer>*/}
+									<BlockHeading type="h3">
+										{t('settings/components/account___wachtwoord')}
+									</BlockHeading>
+									<Spacer margin="top">
+										<Button
+											type="secondary"
+											onClick={() =>
+												redirectToExternalPage(
+													`${ssumPasswordEditPage}&email=${get(
+														user,
+														'mail'
+													)}`,
+													null
+												)
+											}
+											label={t(
+												'settings/components/account___wijzig-wachtwoord'
+											)}
+										/>
 									</Spacer>
+									{!isPupil && (
+										<Spacer margin="top-large">
+											<Alert type="info">
+												<Html
+													className="c-content"
+													content={t(
+														'settings/components/account___beheerd-in-een-centraal-identiteitsmanagementsysteem'
+													)}
+													type="span"
+												/>
+											</Alert>
+										</Spacer>
+									)}
 								</Form>
 
-								<div className="c-hr" />
+								{!isPupil && (
+									<>
+										<div className="c-hr" />
 
-								<FormGroup
-									label={t(
-										'settings/components/account___koppel-je-account-met-andere-platformen'
-									)}
-								>
-									<div>{renderIdpLinkControls('SMARTSCHOOL')}</div>
-									<div>{renderIdpLinkControls('KLASCEMENT')}</div>
-								</FormGroup>
+										<FormGroup
+											label={t(
+												'settings/components/account___koppel-je-account-met-andere-platformen'
+											)}
+										>
+											<div>{renderIdpLinkControls('SMARTSCHOOL')}</div>
+											<div>{renderIdpLinkControls('KLASCEMENT')}</div>
+										</FormGroup>
+									</>
+								)}
 							</Form>
 						</Column>
 						<Column size="3-5">

@@ -14,10 +14,6 @@
 
 	li {
 		border-bottom: .1rem solid mix($color-gray-100, $color-gray-150);
-
-		&:last-child {
-			border: none;
-		}
 	}
 }
 

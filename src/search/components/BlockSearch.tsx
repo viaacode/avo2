@@ -146,26 +146,29 @@ const BlockSearch: FunctionComponent<BlockSearchProps> = ({
 							onOpen={() => setAutocompleteSearchOpen(true)}
 							onClose={() => setAutocompleteSearchOpen(false)}
 							searchMenu
+							placement="top"
 						>
 							<DropdownButton>
 								<TextInput
 									placeholder={t('home/views/home___vul-een-zoekterm-in')}
 									icon="search"
 									value={searchTerms}
-									onChange={searchTerm => handleSearchTermChanged(searchTerm)}
+									onChange={(searchTerm) => handleSearchTermChanged(searchTerm)}
 									onKeyUp={handleSearchFieldKeyUp}
 								/>
 							</DropdownButton>
 							<DropdownContent>
-								{!searchResultsLoading ? (
-									<MenuSearchResultContent
-										menuItems={autocompleteMenuItems}
-										noResultsLabel={t('home/views/home___geen-resultaten')}
-										onClick={id => goToSearchResult(id.toString())}
-									/>
-								) : (
-									<Spinner size="large" />
-								)}
+								<div className="c-dropdown-results">
+									{!searchResultsLoading ? (
+										<MenuSearchResultContent
+											menuItems={autocompleteMenuItems}
+											noResultsLabel={t('home/views/home___geen-resultaten')}
+											onClick={(id) => goToSearchResult(id.toString())}
+										/>
+									) : (
+										<Spinner size="large" />
+									)}
+								</div>
 								<div className="c-menu__footer">
 									<Button
 										block

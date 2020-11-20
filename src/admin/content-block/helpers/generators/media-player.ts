@@ -1,8 +1,9 @@
-import { CheckboxProps } from '@viaa/avo2-components';
+import { CheckboxProps, TextInputProps } from '@viaa/avo2-components';
 
 import { FileUploadProps } from '../../../../shared/components/FileUpload/FileUpload';
-import { PHOTO_TYPES, VIDEO_TYPES } from '../../../../shared/helpers/files';
+import { PHOTO_TYPES } from '../../../../shared/helpers/files';
 import i18n from '../../../../shared/translations/i18n';
+import { validateFlowplayerVideoUrl } from '../../../shared/helpers';
 import {
 	ContentBlockConfig,
 	ContentBlockEditor,
@@ -16,8 +17,8 @@ import {
 	BLOCK_FIELD_DEFAULTS,
 	BLOCK_STATE_DEFAULTS,
 	FILE_FIELD,
+	ITEM_PICKER_FIELD,
 	TEXT_FIELD,
-	VIDEO_FIELD,
 } from './defaults';
 
 export const INITIAL_MEDIA_PLAYER_COMPONENTS_STATE = (): MediaPlayerBlockComponentState => ({
@@ -47,20 +48,20 @@ export const MEDIA_PLAYER_BLOCK_CONFIG = (position: number = 0): ContentBlockCon
 				validator: undefined,
 				editorType: ContentBlockEditor.TextInput,
 			}),
-			item: VIDEO_FIELD(undefined, {
+			item: ITEM_PICKER_FIELD(undefined, {
 				validator: undefined,
 			}),
-			src: FILE_FIELD(undefined, {
+			src: TEXT_FIELD(undefined, {
 				label: i18n.t(
-					'admin/content-block/helpers/generators/media-player___eigen-video-uploaden-optioneel'
+					'admin/content-block/helpers/generators/media-player___eigen-video-url-van-flowplayer-com-optioneel'
 				),
-				validator: undefined,
+				editorType: ContentBlockEditor.TextInput,
+				validator: validateFlowplayerVideoUrl,
 				editorProps: {
-					allowMulti: false,
-					allowedTypes: VIDEO_TYPES,
-					assetType: 'CONTENT_BLOCK_IMAGE',
-					ownerId: '',
-				} as FileUploadProps,
+					placeholder: i18n.t(
+						'admin/content-block/helpers/generators/media-player___bv-https-cdn-flowplayer-com-hls-playlist-m-3-u-8'
+					),
+				} as TextInputProps,
 			}),
 			poster: FILE_FIELD(undefined, {
 				label: i18n.t(
@@ -74,6 +75,18 @@ export const MEDIA_PLAYER_BLOCK_CONFIG = (position: number = 0): ContentBlockCon
 					ownerId: '',
 				} as FileUploadProps,
 			}),
+			annotationTitle: {
+				label: i18n.t('admin/content-block/helpers/generators/image___bijschift-titel'),
+				editorType: ContentBlockEditor.TextInput,
+				validator: undefined,
+			},
+			annotationText: {
+				label: i18n.t(
+					'admin/content-block/helpers/generators/image___bijschrift-beschrijving'
+				),
+				editorType: ContentBlockEditor.TextInput,
+				validator: undefined,
+			},
 			width: {
 				label: i18n.t('admin/content-block/helpers/generators/media-player___breedte'),
 				editorType: ContentBlockEditor.Select,

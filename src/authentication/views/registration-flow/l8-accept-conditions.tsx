@@ -106,9 +106,17 @@ const AcceptConditions: FunctionComponent<AcceptConditionsProps> = ({
 				true,
 				true
 			);
-			await CampaignMonitorService.updateNewsletterPreferences({
-				allActiveUsers: true,
-			});
+			try {
+				await CampaignMonitorService.updateNewsletterPreferences({
+					allActiveUsers: true,
+				});
+			} catch (err) {
+				console.error(
+					'Failed to update newsletter preferences during handleAcceptConditions',
+					err,
+					{ user }
+				);
+			}
 
 			getLoginState();
 		} catch (err) {

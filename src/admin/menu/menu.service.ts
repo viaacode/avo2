@@ -91,7 +91,7 @@ export class MenuService {
 
 	public static async updateMenuItems(menuItems: Avo.Menu.Menu[]): Promise<void> {
 		try {
-			const promises: Promise<any>[] = menuItems.map(menuItem => {
+			const promises: Promise<any>[] = menuItems.map((menuItem) => {
 				return dataService.mutate({
 					mutation: UPDATE_MENU_ITEM_BY_ID,
 					variables: {

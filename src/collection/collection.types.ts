@@ -1,50 +1,6 @@
-import {
-	BlockImageProps,
-	BlockImageTitleTextButtonProps,
-	BlockIntroProps,
-	BlockLinksProps,
-	BlockQuoteProps,
-	BlockTitleImageTextProps,
-	BlockVideoProps,
-	BlockVideoTitleTextButtonProps,
-	DutchContentType,
-	EnglishContentType,
-} from '@viaa/avo2-components';
+import { invert } from 'lodash-es';
 
-export type CollectionOverviewTableColumns =
-	| 'thumbnail'
-	| 'title'
-	| 'updated_at'
-	| 'inFolder'
-	| 'access'
-	| 'actions';
-
-export enum ContentBlockType {
-	'Image',
-	'ImageTitleTextButton',
-	'Intro',
-	'Links',
-	'Quote',
-	'RichText',
-	'TitleImageText',
-	'Video',
-	'VideoTitleTextButton',
-}
-
-export type ContentBlockMetaData =
-	| BlockImageProps
-	| BlockImageTitleTextButtonProps
-	| BlockIntroProps
-	| BlockLinksProps
-	| BlockQuoteProps
-	| BlockTitleImageTextProps
-	| BlockVideoProps
-	| BlockVideoTitleTextButtonProps;
-
-export interface ContentBlockInfo {
-	blockType: ContentBlockType;
-	content: ContentBlockMetaData;
-}
+import { DutchContentType, EnglishContentType } from '@viaa/avo2-components';
 
 export enum ContentTypeNumber {
 	audio = 1,
@@ -62,17 +18,23 @@ export enum ContentTypeString {
 	searchquery = 'zoekopdracht',
 }
 
+const CONTENT_TYPE_TRANSLATIONS = {
+	item: 'item',
+	audio: 'audio',
+	video: 'video',
+	collectie: 'collection',
+	map: 'bundle',
+	bundel: 'bundle',
+	zoek: 'search',
+	zoekopdracht: 'searchquery',
+};
+
 export function toEnglishContentType(label: DutchContentType): EnglishContentType {
-	return {
-		item: 'item',
-		audio: 'audio',
-		video: 'video',
-		collectie: 'collection',
-		map: 'bundle',
-		bundel: 'bundle',
-		zoek: 'search',
-		zoekopdracht: 'searchquery',
-	}[label] as EnglishContentType;
+	return CONTENT_TYPE_TRANSLATIONS[label] as EnglishContentType;
+}
+
+export function toDutchContentType(label: EnglishContentType): DutchContentType {
+	return invert(CONTENT_TYPE_TRANSLATIONS)[label] as DutchContentType;
 }
 
 export type CollectionLabelLookup = { [id: string]: string };
@@ -80,4 +42,11 @@ export type CollectionLabelLookup = { [id: string]: string };
 export interface QualityLabel {
 	description: string;
 	value: string;
+}
+
+export interface Relation {
+	object_meta: {
+		id: string;
+		title: string;
+	};
 }

@@ -13,9 +13,13 @@ import {
 	TextInput,
 } from '@viaa/avo2-components';
 
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { toDutchContentType } from '../../../collection/collection.types';
 import { copyToClipboard } from '../../helpers';
+import withUser, { UserProps } from '../../hocs/withUser';
 import { ToastService } from '../../services';
 import { CampaignMonitorService, EmailTemplateType } from '../../services/campaign-monitor-service';
+import { trackEvents } from '../../services/event-logging-service';
 
 import './ShareThroughEmailModal.scss';
 
@@ -28,13 +32,14 @@ interface AddToCollectionModalProps {
 	onClose: () => void;
 }
 
-const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps> = ({
+const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps & UserProps> = ({
 	modalTitle,
 	type,
 	emailLinkHref,
 	emailLinkTitle,
 	isOpen,
 	onClose,
+	user,
 }) => {
 	const [t] = useTranslation();
 
@@ -43,6 +48,19 @@ const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps> = ({
 
 	const copyLink = () => {
 		copyToClipboard(emailLinkHref);
+
+		trackEvents(
+			{
+				object: (emailLinkHref.split('/').pop() || '').split('?')[0] || '',
+				object_type: type,
+				message: `${getProfileName(user)} heeft een ${toDutchContentType(
+					type
+				)} url gekopieerd`,
+				action: 'share',
+			},
+			user
+		);
+
 		ToastService.success(
 			t(
 				'shared/components/share-through-email-modal/share-through-email-modal___de-url-is-naar-het-klembord-gekopieerd'
@@ -59,6 +77,19 @@ const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps> = ({
 				emailLinkHref,
 				type
 			);
+
+			trackEvents(
+				{
+					object: (emailLinkHref.split('/').pop() || '').split('?')[0] || '',
+					object_type: type,
+					message: `${getProfileName(user)} heeft een ${toDutchContentType(
+						type
+					)} gedeeld via email`,
+					action: 'share',
+				},
+				user
+			);
+
 			ToastService.success(
 				t(
 					'shared/components/share-through-email-modal/share-through-email-modal___de-email-is-verstuurd'
@@ -99,7 +130,7 @@ const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps> = ({
 						'shared/components/share-through-email-modal/share-through-email-modal___waarschuwing-deel-link-via-email'
 					)}
 				</p>
-				<Spacer margin="top-large">
+				<Spacer margin={['top-large', 'bottom-large']}>
 					<Box backgroundColor="gray" condensed>
 						<Flex wrap justify="between" align="baseline">
 							<FlexItem className="u-truncate c-share-through-email-modal__link">
@@ -166,4 +197,4 @@ const ShareThroughEmailModal: FunctionComponent<AddToCollectionModalProps> = ({
 	);
 };
 
-export default ShareThroughEmailModal;
+export default withUser(ShareThroughEmailModal) as FunctionComponent<AddToCollectionModalProps>;

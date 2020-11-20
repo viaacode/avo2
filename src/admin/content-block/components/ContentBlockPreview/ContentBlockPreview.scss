@@ -1,8 +1,11 @@
 @import '../../../../styles/settings/colors';
 
+.c-content-page-overview-block__header {
+	opacity: 0;
+}
+
 .c-content-block {
 	position: relative;
-	z-index: 1;
 
 	> div {
 		z-index: 2;

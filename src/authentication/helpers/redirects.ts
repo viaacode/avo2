@@ -1,10 +1,12 @@
 import { History, Location } from 'history';
-import { get, trimEnd, trimStart } from 'lodash-es';
+import { get, isString, omit, trimEnd, trimStart } from 'lodash-es';
 import queryString from 'query-string';
 
 import { Avo } from '@viaa/avo2-types';
 
 import { APP_PATH } from '../../constants';
+import { ErrorViewQueryParams } from '../../error/views/ErrorView';
+import { ROUTE_PARTS } from '../../shared/constants';
 import { getEnv } from '../../shared/helpers';
 import { SERVER_LOGOUT_PAGE } from '../authentication.const';
 import { STAMBOEK_LOCAL_STORAGE_KEY } from '../views/registration-flow/r3-stamboek';
@@ -14,12 +16,21 @@ import { STAMBOEK_LOCAL_STORAGE_KEY } from '../views/registration-flow/r3-stambo
  * Client redirect functions
  *
  **/
-export function redirectToClientPage(path: string, history: History, fromPath?: string) {
-	if (fromPath) {
-		history.push(path, { from: { pathname: fromPath } });
-	} else {
-		history.push(path);
-	}
+export function redirectToClientPage(path: string, history: History) {
+	history.push(path);
+}
+
+export function redirectToErrorPage(props: ErrorViewQueryParams, location: Location) {
+	const baseUrl = getBaseUrl(location);
+	window.location.href = `${baseUrl}/error?${queryString.stringify(props)}`;
+}
+
+export function redirectToLoggedOutHome(location: Location) {
+	window.location.href = getBaseUrl(location);
+}
+
+export function redirectToLoggedInHome(location: Location) {
+	window.location.href = `${getBaseUrl(location)}/start`;
 }
 
 /**
@@ -27,10 +38,21 @@ export function redirectToClientPage(path: string, history: History, fromPath?: 
  * Server redirect functions
  *
  **/
+export function redirectToServerLoginPage(location: Location) {
+	// Redirect to login form
+	// Url to return to after authentication is completed and server stored auth object in session
+	const returnToUrl = getRedirectAfterLogin(location);
+	// Not logged in, we need to redirect the user to the SAML identity server login page
+	window.location.href = `${getEnv('PROXY_URL')}/auth/hetarchief/login?${queryString.stringify({
+		returnToUrl,
+		stamboekNumber: localStorage && localStorage.getItem(STAMBOEK_LOCAL_STORAGE_KEY),
+	})}`;
+}
+
 export function redirectToServerSmartschoolLogin(location: Location) {
 	// Redirect to smartschool login form
 	// Url to return to after authentication is completed and server stored auth object in session
-	const returnToUrl = getFullFromUrl(location);
+	const returnToUrl = getRedirectAfterLogin(location);
 	window.location.href = `${getEnv('PROXY_URL')}/auth/smartschool/login?${queryString.stringify({
 		returnToUrl,
 	})}`;
@@ -39,7 +61,7 @@ export function redirectToServerSmartschoolLogin(location: Location) {
 export function redirectToServerKlascementLogin(location: Location) {
 	// Redirect to klascement login form
 	// Url to return to after authentication is completed and server stored auth object in session
-	const returnToUrl = getFullFromUrl(location);
+	const returnToUrl = getRedirectAfterLogin(location);
 	window.location.href = `${getEnv('PROXY_URL')}/auth/klascement/login?${queryString.stringify({
 		returnToUrl,
 	})}`;
@@ -55,17 +77,6 @@ export function redirectToServerArchiefRegistrationIdp(location: Location, stamb
 	)}`;
 }
 
-export function redirectToServerLoginPage(location: Location) {
-	// Redirect to login form
-	// Url to return to after authentication is completed and server stored auth object in session
-	const returnToUrl = getFullFromUrl(location);
-	// Not logged in, we need to redirect the user to the SAML identity server login page
-	window.location.href = `${getEnv('PROXY_URL')}/auth/login?${queryString.stringify({
-		returnToUrl,
-		stamboekNumber: localStorage.getItem(STAMBOEK_LOCAL_STORAGE_KEY),
-	})}`;
-}
-
 export function redirectToServerLogoutPage(location: Location, routeAfterLogout: string) {
 	// Url to return to after logout is completed
 	const returnToUrl = `${getBaseUrl(location)}${routeAfterLogout}`;
@@ -74,9 +85,17 @@ export function redirectToServerLogoutPage(location: Location, routeAfterLogout:
 	})}`;
 }
 
-export function logoutAndRedirectToLogin() {
+export function logoutAndRedirectToLogin(location?: Location) {
 	// Url to return to after logout is completed
-	const returnToUrl = window.location.origin + APP_PATH.REGISTER_OR_LOGIN.route;
+	let returnToUrl = window.location.origin + APP_PATH.REGISTER_OR_LOGIN.route;
+
+	if (location) {
+		returnToUrl = `${returnToUrl}?${queryString.stringify({
+			// Url to redirect to after logging back in
+			returnToUrl: getRedirectAfterLogin(location),
+		})}`;
+	}
+
 	window.location.href = `${getEnv('PROXY_URL')}/${SERVER_LOGOUT_PAGE}?${queryString.stringify({
 		returnToUrl,
 	})}`;
@@ -117,24 +136,50 @@ export function redirectToExternalPage(link: string, target: '_blank' | string |
 }
 
 export function getBaseUrl(location: Location): string {
-	return window.location.href.split(location.pathname)[0];
+	if (location.pathname === '/') {
+		return trimEnd(window.location.href, '/');
+	}
+	return trimEnd(decodeURIComponent(window.location.href).split(location.pathname)[0], '/');
 }
 
 export function getFromPath(
 	location: Location,
 	defaultPath: string = APP_PATH.LOGGED_IN_HOME.route
 ): string {
-	return (
-		get(location, 'state.from.pathname', defaultPath) + get(location, 'state.from.search', '')
-	);
+	let fromPath = get(location, 'state.from.pathname') || get(location, 'pathname') || defaultPath;
+	if (fromPath === `/${ROUTE_PARTS.registerOrLogin}`) {
+		fromPath = '/';
+	}
+	const fromSearch = get(location, 'state.from.search') || get(location, 'search') || '';
+	return `/${trimStart(fromPath + fromSearch, '/')}`;
 }
 
-export function getFullFromUrl(
+export function getRedirectAfterLogin(
 	location: Location,
 	defaultPath: string = APP_PATH.LOGGED_IN_HOME.route
 ) {
-	return `${trimEnd(getBaseUrl(location), '/')}/${trimStart(
-		getFromPath(location, defaultPath),
-		'/'
+	// From query string
+	const queryStrings = queryString.parse(location.search);
+	if (queryStrings.returnToUrl && isString(queryStrings.returnToUrl)) {
+		const returnToUrl = queryStrings.returnToUrl;
+		if (!returnToUrl.startsWith('http') && !returnToUrl.startsWith('//')) {
+			// make url absolute
+			return getBaseUrl(location) + returnToUrl;
+		}
+		return returnToUrl;
+	}
+
+	// From location history
+	if (location.pathname === `/${ROUTE_PARTS.registerOrLogin}`) {
+		return getBaseUrl(location) + getFromPath(location);
+	}
+
+	const base = getBaseUrl(location);
+	const from = getFromPath(location, defaultPath);
+	if (from === '/') {
+		return `${base}${defaultPath}`;
+	}
+	return `${base}${from}${location.hash || ''}${queryString.stringify(
+		omit(queryStrings, ['returnToUrl'])
 	)}`;
 }

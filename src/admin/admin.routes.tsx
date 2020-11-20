@@ -2,6 +2,7 @@ import { every, some } from 'lodash-es';
 import React, { ReactNode } from 'react';
 import { Switch } from 'react-router';
 
+import { PermissionName } from '../authentication/helpers/permission-names';
 import { renderErrorRoutes } from '../error/error.routes';
 
 import { renderCollectionOrBundleRoutes } from './collectionsOrBundles/collections-or-bundles.routes';
@@ -9,7 +10,7 @@ import { renderAdminContentPageLabelRoutes } from './content-page-labels/content
 import { renderAdminContentRoutes } from './content/content.routes';
 import { renderAdminDashboardRoutes } from './dashboard/dashboard.routes';
 import { renderInteractiveTourRoutes } from './interactive-tour/interactive-tour.routes';
-import { renderItemRoutes } from './items/items.routes';
+import { renderItemRoutes, renderPublishItemRoutes } from './items/items.routes';
 import { renderAdminMenuRoutes } from './menu/menu.routes';
 import { renderAdminPermissionGroupRoutes } from './permission-groups/permission-group.routes';
 import { renderAdminTranslationsRoutes } from './translations/translations.routes';
@@ -25,13 +26,13 @@ export const renderAdminRoutes = (userPermissions: string[]) => {
 		if (booleanOperator === 'OR') {
 			// OR
 			// If at least one of the permissions is met, render the routes
-			if (some(permissions, permission => userPermissions.includes(permission))) {
+			if (some(permissions, (permission) => userPermissions.includes(permission))) {
 				return renderFunc(userPermissions);
 			}
 		} else {
 			// AND
 			// All permissions have to be met
-			if (every(permissions, permission => userPermissions.includes(permission))) {
+			if (every(permissions, (permission) => userPermissions.includes(permission))) {
 				return renderFunc(userPermissions);
 			}
 		}
@@ -41,24 +42,33 @@ export const renderAdminRoutes = (userPermissions: string[]) => {
 	return (
 		<Switch>
 			{renderAdminDashboardRoutes()}
-			{renderWithPermissions(renderAdminUserRoutes, ['VIEW_USERS'])}
-			{renderWithPermissions(renderAdminUserGroupRoutes, ['EDIT_USER_GROUPS'])}
-			{renderWithPermissions(renderAdminPermissionGroupRoutes, ['EDIT_PERMISSION_GROUPS'])}
-			{renderWithPermissions(renderAdminMenuRoutes, ['EDIT_NAVIGATION_BARS'])}
+			{renderWithPermissions(renderAdminUserRoutes, [PermissionName.VIEW_USERS])}
+			{renderWithPermissions(renderAdminUserGroupRoutes, [PermissionName.EDIT_USER_GROUPS])}
+			{renderWithPermissions(renderAdminPermissionGroupRoutes, [
+				PermissionName.EDIT_PERMISSION_GROUPS,
+			])}
+			{renderWithPermissions(renderAdminMenuRoutes, [PermissionName.EDIT_NAVIGATION_BARS])}
 			{renderWithPermissions(
 				renderAdminContentRoutes,
-				['EDIT_OWN_CONTENT_PAGES', 'EDIT_ANY_CONTENT_PAGES'],
+				[PermissionName.EDIT_OWN_CONTENT_PAGES, PermissionName.EDIT_ANY_CONTENT_PAGES],
 				'OR'
 			)}
-			{renderWithPermissions(renderAdminContentPageLabelRoutes, ['EDIT_CONTENT_PAGE_LABELS'])}
-			{renderWithPermissions(renderItemRoutes, ['VIEW_ITEMS_OVERVIEW'])}
+			{renderWithPermissions(renderAdminContentPageLabelRoutes, [
+				PermissionName.EDIT_CONTENT_PAGE_LABELS,
+			])}
+			{renderWithPermissions(renderItemRoutes, [PermissionName.VIEW_ITEMS_OVERVIEW])}
+			{renderWithPermissions(renderPublishItemRoutes, [PermissionName.PUBLISH_ITEMS])}
 			{renderWithPermissions(
 				renderCollectionOrBundleRoutes,
-				['VIEW_COLLECTIONS_OVERVIEW', 'VIEW_BUNDLES_OVERVIEW'],
+				[PermissionName.VIEW_COLLECTIONS_OVERVIEW, PermissionName.VIEW_BUNDLES_OVERVIEW],
 				'OR'
 			)}
-			{renderWithPermissions(renderInteractiveTourRoutes, ['EDIT_INTERACTIVE_TOURS'])}
-			{renderWithPermissions(renderAdminTranslationsRoutes, ['EDIT_TRANSLATIONS'])}
+			{renderWithPermissions(renderInteractiveTourRoutes, [
+				PermissionName.EDIT_INTERACTIVE_TOURS,
+			])}
+			{renderWithPermissions(renderAdminTranslationsRoutes, [
+				PermissionName.EDIT_TRANSLATIONS,
+			])}
 			{/* Default routes */}
 			{renderErrorRoutes()}
 		</Switch>

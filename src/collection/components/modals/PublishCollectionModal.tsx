@@ -9,7 +9,6 @@ import {
 	FormGroup,
 	Modal,
 	ModalBody,
-	RadioButton,
 	RadioButtonGroup,
 	Spacer,
 	Toolbar,
@@ -31,19 +30,6 @@ interface PublishCollectionModalProps extends DefaultSecureRouteProps {
 	onClose: (collection?: Avo.Collection.Collection) => void;
 	collection: Avo.Collection.Collection;
 }
-
-const GET_SHARE_OPTIONS = () => [
-	{
-		value: 'private',
-		label: i18n.t('collection/components/modals/share-collection-modal___niet-openbaar'),
-		isPublic: false,
-	},
-	{
-		value: 'public',
-		label: i18n.t('collection/components/modals/share-collection-modal___openbaar'),
-		isPublic: true,
-	},
-];
 
 const PublishCollectionModal: FunctionComponent<PublishCollectionModalProps> = ({
 	onClose,
@@ -80,7 +66,7 @@ const PublishCollectionModal: FunctionComponent<PublishCollectionModalProps> = (
 				const validationErrors: string[] = await getValidationErrorsForPublish(collection);
 
 				if (validationErrors && validationErrors.length) {
-					setValidationError(validationErrors.map(rule => get(rule[1], 'error')));
+					setValidationError(validationErrors.map((rule) => get(rule[1], 'error')));
 					ToastService.danger(validationErrors);
 					return;
 				}
@@ -118,10 +104,10 @@ const PublishCollectionModal: FunctionComponent<PublishCollectionModalProps> = (
 			trackEvents(
 				{
 					object: String(collection.id),
-					object_type: 'collections',
-					message: `Gebruiker ${getProfileName(user)} heeft de ${
+					object_type: isCollection() ? 'collection' : 'bundle',
+					message: `Gebruiker ${getProfileName(user)} heeft een ${
 						isCollection() ? 'collectie' : 'bundel'
-					} ${collection.id} ${isPublished ? 'gepubliceerd' : 'gedepubliceerd'}`,
+					} ${isPublished ? 'gepubliceerd' : 'gedepubliceerd'}`,
 					action: isPublished ? 'publish' : 'unpublish',
 				},
 				user
@@ -172,18 +158,26 @@ const PublishCollectionModal: FunctionComponent<PublishCollectionModalProps> = (
 							</Trans>
 						</BlockHeading>
 					</Spacer>
-					<RadioButtonGroup>
-						{GET_SHARE_OPTIONS().map((shareOption, index) => (
-							<RadioButton
-								key={index}
-								name={shareOption.value}
-								label={shareOption.label}
-								value={shareOption.value}
-								onChange={() => setIsCollectionPublic(shareOption.isPublic)}
-								checked={isCollectionPublic === shareOption.isPublic}
-							/>
-						))}
-					</RadioButtonGroup>
+					<RadioButtonGroup
+						options={[
+							{
+								value: 'private',
+								label: i18n.t(
+									'collection/components/modals/share-collection-modal___niet-openbaar'
+								),
+							},
+							{
+								value: 'public',
+								label: i18n.t(
+									'collection/components/modals/share-collection-modal___openbaar'
+								),
+							},
+						]}
+						value={isCollectionPublic ? 'public' : 'private'}
+						onChange={(value: string) => {
+							setIsCollectionPublic(value === 'public');
+						}}
+					/>
 				</FormGroup>
 				<Toolbar spaced>
 					<ToolbarRight>

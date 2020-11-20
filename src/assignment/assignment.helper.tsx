@@ -13,7 +13,6 @@ import {
 	FlexItem,
 	Form,
 	FormGroup,
-	RadioButton,
 	RadioButtonGroup,
 	Spacer,
 	TextInput,
@@ -22,7 +21,8 @@ import {
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-import { getProfileId } from '../authentication/helpers/get-profile-info';
+import { getProfileId } from '../authentication/helpers/get-profile-id';
+import { getProfileName } from '../authentication/helpers/get-profile-info';
 import { toEnglishContentType } from '../collection/collection.types';
 import { APP_PATH } from '../constants';
 import { LoadingInfo } from '../shared/components';
@@ -31,8 +31,8 @@ import WYSIWYGWrapper from '../shared/components/WYSIWYGWrapper/WYSIWYGWrapper';
 import { WYSIWYG_OPTIONS_FULL } from '../shared/constants';
 import { navigate } from '../shared/helpers';
 import { ToastService } from '../shared/services';
+import { trackEvents } from '../shared/services/event-logging-service';
 import i18n from '../shared/translations/i18n';
-import { ASSIGNMENTS_ID } from '../workspace/workspace.const';
 
 import { CONTENT_LABEL_TO_ROUTE_PARTS } from './assignment.const';
 import { AssignmentService } from './assignment.service';
@@ -51,19 +51,33 @@ export class AssignmentHelper {
 		try {
 			if (isNil(assignment.id)) {
 				ToastService.danger(
-					'Je kan een opdracht pas dupliceren nadat je hem hebt opgeslagen.'
+					i18n.t(
+						'assignment/assignment___je-kan-een-opdracht-pas-dupliceren-nadat-je-hem-hebt-opgeslagen'
+					)
 				);
 				return;
 			}
 			if (!user) {
 				ToastService.danger(
-					'De opdracht kan niet gedupliceerd worden omdat je niet meer bent ingelogd.'
+					i18n.t(
+						'assignment/assignment___de-opdracht-kan-niet-gedupliceerd-worden-omdat-je-niet-meer-bent-ingelogd'
+					)
 				);
 				return;
 			}
 			const duplicatedAssignment = await AssignmentService.duplicateAssignment(
 				newTitle,
 				assignment,
+				user
+			);
+
+			trackEvents(
+				{
+					object: String(assignment.id),
+					object_type: 'assignment',
+					message: `Gebruiker ${getProfileName(user)} heeft een opdracht gedupliceerd`,
+					action: 'copy',
+				},
 				user
 			);
 
@@ -80,34 +94,6 @@ export class AssignmentHelper {
 			console.error('Failed to copy the assignment', err);
 			ToastService.danger(
 				i18n.t('assignment/views/assignment-edit___het-kopieren-van-de-opdracht-is-mislukt')
-			);
-		}
-	}
-
-	public static async deleteCurrentAssignment(
-		assignment: Partial<Avo.Assignment.Assignment>,
-		history: History
-	) {
-		try {
-			if (typeof assignment.id === 'undefined') {
-				ToastService.danger(
-					i18n.t(
-						'assignment/views/assignment-edit___de-huidige-opdracht-is-nog-nooit-opgeslagen-geen-id'
-					)
-				);
-				return;
-			}
-			await AssignmentService.deleteAssignment(assignment.id);
-			navigate(history, APP_PATH.WORKSPACE_TAB.route, { tabId: ASSIGNMENTS_ID });
-			ToastService.success(
-				i18n.t('assignment/views/assignment-edit___de-opdracht-is-verwijderd')
-			);
-		} catch (err) {
-			console.error(err);
-			ToastService.danger(
-				i18n.t(
-					'assignment/views/assignment-edit___het-verwijderen-van-de-opdracht-is-mislukt'
-				)
 			);
 		}
 	}
@@ -186,6 +172,20 @@ export class AssignmentHelper {
 		return !!assignment.deadline_at && new Date(assignment.deadline_at) < new Date(Date.now());
 	}
 
+	private static getContentLayoutOptions() {
+		const options = [
+			{
+				label: i18n.t('assignment/views/assignment-edit___mediaspeler-met-beschrijving'),
+				value: AssignmentLayout.PlayerAndText,
+			},
+			{
+				label: i18n.t('assignment/views/assignment-edit___enkel-mediaspeler'),
+				value: AssignmentLayout.OnlyPlayer,
+			},
+		] as any[];
+		return options;
+	}
+
 	public static renderAssignmentForm(
 		assignment: Partial<Avo.Assignment.Assignment>,
 		assignmentContent: Avo.Assignment.Content | null,
@@ -210,7 +210,7 @@ export class AssignmentHelper {
 							<TextInput
 								id="title"
 								value={assignment.title}
-								onChange={title => setAssignmentProp('title', title)}
+								onChange={(title) => setAssignmentProp('title', title)}
 							/>
 						</FormGroup>
 						<FormGroup
@@ -223,7 +223,7 @@ export class AssignmentHelper {
 								state={(assignment as any)['descriptionRichEditorState']}
 								controls={[...WYSIWYG_OPTIONS_FULL, 'media']}
 								fileType="ASSIGNMENT_DESCRIPTION_IMAGE"
-								onChange={newState =>
+								onChange={(newState) =>
 									setAssignmentProp('descriptionRichEditorState', newState)
 								}
 							/>
@@ -235,43 +235,20 @@ export class AssignmentHelper {
 							label={i18n.t('assignment/views/assignment-edit___weergave')}
 							labelFor="only_player"
 						>
-							<RadioButtonGroup>
-								<RadioButton
-									label={i18n.t(
-										'assignment/views/assignment-edit___mediaspeler-met-beschrijving'
-									)}
-									name="content_layout"
-									value={String(AssignmentLayout.PlayerAndText)}
-									checked={
-										isNil(assignment.content_layout) ||
-										assignment.content_layout === AssignmentLayout.PlayerAndText
-									}
-									onChange={isChecked =>
-										isChecked &&
-										setAssignmentProp(
-											'content_layout',
-											AssignmentLayout.PlayerAndText
-										)
-									}
-								/>
-								<RadioButton
-									label={i18n.t(
-										'assignment/views/assignment-edit___enkel-mediaspeler'
-									)}
-									name="content_layout"
-									value={String(AssignmentLayout.OnlyPlayer)}
-									checked={
-										assignment.content_layout === AssignmentLayout.OnlyPlayer
-									}
-									onChange={isChecked =>
-										isChecked &&
-										setAssignmentProp(
-											'content_layout',
-											AssignmentLayout.OnlyPlayer
-										)
-									}
-								/>
-							</RadioButtonGroup>
+							<RadioButtonGroup
+								options={AssignmentHelper.getContentLayoutOptions()}
+								value={
+									isNil(assignment.content_layout)
+										? null
+										: (assignment.content_layout as any)
+								}
+								onChange={(value: string) => {
+									setAssignmentProp(
+										'content_layout',
+										value ? parseInt(value, 10) : null
+									);
+								}}
+							/>
 						</FormGroup>
 						<FormGroup
 							label={i18n.t('assignment/views/assignment-edit___klas-of-groep')}
@@ -280,7 +257,7 @@ export class AssignmentHelper {
 							<TextInput
 								id="class_room"
 								value={assignment.class_room || ''}
-								onChange={classRoom => setAssignmentProp('class_room', classRoom)}
+								onChange={(classRoom) => setAssignmentProp('class_room', classRoom)}
 							/>
 						</FormGroup>
 						<FormGroup
@@ -301,7 +278,7 @@ export class AssignmentHelper {
 								type="text"
 								placeholder={i18n.t('assignment/views/assignment-edit___http')}
 								value={assignment.answer_url || ''}
-								onChange={value => setAssignmentProp('answer_url', value)}
+								onChange={(value) => setAssignmentProp('answer_url', value)}
 							/>
 							<p className="c-form-help-text">
 								<Trans i18nKey="assignment/views/assignment-edit___waar-geeft-de-leerling-de-antwoorden-in-voeg-een-optionele-url-naar-een-ander-platform-toe">
@@ -342,7 +319,9 @@ export class AssignmentHelper {
 												? new Date(assignment.deadline_at)
 												: null
 										}
-										onChange={value => setAssignmentProp('deadline_at', value)}
+										onChange={(value) =>
+											setAssignmentProp('deadline_at', value)
+										}
 										showTimeInput
 									/>
 								</Spacer>
@@ -374,7 +353,7 @@ export class AssignmentHelper {
 							>
 								<Toggle
 									checked={assignment.is_collaborative}
-									onChange={checked =>
+									onChange={(checked) =>
 										setAssignmentProp('is_collaborative', checked)
 									}
 								/>

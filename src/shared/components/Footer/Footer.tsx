@@ -34,7 +34,7 @@ export const Footer: FunctionComponent<RouteComponentProps & UserProps> = ({
 				setPrimaryNavItems(navItems['footer-links']);
 				setSecondaryNavItems(navItems['footer-rechts']);
 			})
-			.catch(err => {
+			.catch((err) => {
 				console.error('Failed to get navigation items', err);
 				// Do not notify the user, since this will happen in the header navigation component already
 				// And we don't want to show 2 error toast messages
@@ -50,7 +50,7 @@ export const Footer: FunctionComponent<RouteComponentProps & UserProps> = ({
 	};
 
 	const mapNavItems = (navItems: NavigationItemInfo[]) => {
-		return navItems.map(item => (
+		return navItems.map((item) => (
 			<NavigationItem
 				key={item.key}
 				item={item}

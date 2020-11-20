@@ -12,6 +12,16 @@
 		.c-content > p {
 			max-width: 100%;
 		}
+
+		.c-toolbar__item {
+			margin-bottom: 15px;
+		}
+	}
+
+	&.c-assignment-detail--mobile {
+		.c-video-column {
+			margin-bottom: 15px;
+		}
 	}
 
 	.c-toolbar {

@@ -27,18 +27,23 @@ export class ContentPageService {
 					credentials: 'include',
 				}
 			);
-			if (response.status === 404) {
-				return null;
-			}
+			let responseContent: any;
+			try {
+				responseContent = await response.json();
+			} catch (err) {}
 			if (response.status < 200 || response.status >= 400) {
 				throw new CustomError('Failed to get content page from /content-pages', null, {
 					path,
 					response,
+					responseContent,
 				});
 			}
-			return convertToContentPageInfo(await response.json());
+			if (responseContent.error) {
+				return responseContent.error;
+			}
+			return convertToContentPageInfo(responseContent);
 		} catch (err) {
-			throw new CustomError('Failed to get all user groups', err);
+			throw new CustomError('Failed to get content page by path', err);
 		}
 	}
 

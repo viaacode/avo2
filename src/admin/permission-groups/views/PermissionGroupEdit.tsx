@@ -85,8 +85,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			} catch (err) {
 				console.error(
 					new CustomError('Failed to get permission group by id', err, {
-						query: 'GET_PERMISSION_GROUP_BY_ID',
-						variables: { id: match.params.id },
+						id: match.params.id,
 					})
 				);
 				setLoadingInfo({
@@ -106,8 +105,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			ToastService.danger(
 				t(
 					'admin/permission-groups/views/permission-group-edit___het-ophalen-van-alle-permissies-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	}, [setAllPermissions, t]);
@@ -151,7 +149,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 		setPermissionGroup({
 			...permissionGroup,
 			permissions: (permissionGroup.permissions || []).filter(
-				permission => permission.id !== permissionIdToDelete
+				(permission) => permission.id !== permissionIdToDelete
 			),
 		});
 	};
@@ -164,18 +162,18 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			ToastService.danger(
 				t(
 					'admin/permission-groups/views/permission-group-edit___deze-permissie-zit-reeds-in-de-groep'
-				),
-				false
+				)
 			);
 			return;
 		}
-		const selectedPermission = allPermissions.find(p => String(p.id) === selectedPermissionId);
+		const selectedPermission = allPermissions.find(
+			(p) => String(p.id) === selectedPermissionId
+		);
 		if (!selectedPermission) {
 			ToastService.danger(
 				t(
 					'admin/permission-groups/views/permission-group-edit___de-geselecteerde-permissie-kon-niet-worden-gevonden'
-				),
-				false
+				)
 			);
 			return;
 		}
@@ -192,10 +190,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			setFormErrors(errors || {});
 			if (errors) {
 				ToastService.danger(
-					t(
-						'admin/permission-groups/views/permission-group-edit___de-invoer-is-ongeldig'
-					),
-					false
+					t('admin/permission-groups/views/permission-group-edit___de-invoer-is-ongeldig')
 				);
 				return;
 			}
@@ -204,8 +199,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 				ToastService.danger(
 					t(
 						'admin/permission-groups/views/permission-group-edit___het-opslaan-van-de-permissie-groep-is-mislukt-omdat-de-permissie-groep-nog-niet-is-geladen'
-					),
-					false
+					)
 				);
 				return;
 			}
@@ -234,28 +228,23 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			);
 
 			await PermissionGroupService.addPermissionsToGroup(
-				addedPermissions.map(p => p.id),
+				addedPermissions.map((p) => p.id),
 				permissionGroupId
 			);
 			await PermissionGroupService.removePermissionsFromPermissionGroup(
-				removedPermissions.map(p => p.id),
+				removedPermissions.map((p) => p.id),
 				permissionGroupId
 			);
 
 			ToastService.success(
 				t(
 					'admin/permission-groups/views/permission-group-edit___de-permissie-groep-is-opgeslagen'
-				),
-				false
+				)
 			);
-			if (isCreatePage) {
-				redirectToClientPage(
-					buildLink(ADMIN_PATH.PERMISSION_GROUP_EDIT, { id: permissionGroupId }),
-					history
-				);
-			} else {
-				initOrFetchPermissionGroup();
-			}
+			redirectToClientPage(
+				buildLink(ADMIN_PATH.PERMISSION_GROUP_DETAIL, { id: permissionGroupId }),
+				history
+			);
 		} catch (err) {
 			console.error(
 				new CustomError('Failed to save permission group', err, {
@@ -266,8 +255,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			ToastService.danger(
 				t(
 					'admin/permission-groups/views/permission-group-edit___het-opslaan-van-de-permissiegroep-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 		setIsSaving(false);
@@ -278,13 +266,13 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 			permissionGroup,
 			'permissions',
 			[]
-		) as Permission[]).map(p => p.id);
+		) as Permission[]).map((p) => p.id);
 		return allPermissions
-			.filter(p => {
+			.filter((p) => {
 				// Don't show permissions that are already part of the permission group permissions
 				return !permissionIdsInGroup.includes(p.id);
 			})
-			.map(p => ({
+			.map((p) => ({
 				label: p.description || p.label,
 				value: String(p.id),
 			}));
@@ -334,7 +322,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 								>
 									<TextInput
 										value={permissionGroup.label || ''}
-										onChange={newLabel =>
+										onChange={(newLabel) =>
 											setPermissionGroup({
 												...permissionGroup,
 												label: newLabel,
@@ -350,7 +338,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 								>
 									<TextInput
 										value={permissionGroup.description || ''}
-										onChange={newDescription =>
+										onChange={(newDescription) =>
 											setPermissionGroup({
 												...permissionGroup,
 												description: newDescription,
@@ -412,7 +400,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 							emptyStateMessage={t(
 								'admin/permission-groups/views/permission-group-edit___deze-groep-bevat-nog-geen-permissies'
 							)}
-							onColumnClick={columId =>
+							onColumnClick={(columId) =>
 								handleSortClick(columId as PermissionsTableCols)
 							}
 							renderCell={(rowData: PermissionGroup, columnId: string) =>
@@ -432,7 +420,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 	// Render
 	const renderPage = () => (
 		<AdminLayout
-			showBackButton
+			onClickBackButton={() => navigate(history, ADMIN_PATH.PERMISSION_GROUP_OVERVIEW)}
 			pageTitle={
 				isCreatePage
 					? t(
@@ -442,6 +430,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 							'admin/permission-groups/views/permission-group-edit___permissie-groep-aanpassen'
 					  )
 			}
+			size="large"
 		>
 			<AdminLayoutTopBarRight>
 				<ButtonToolbar>
@@ -457,11 +446,7 @@ const PermissionGroupEdit: FunctionComponent<PermissionGroupEditProps> = ({
 					/>
 				</ButtonToolbar>
 			</AdminLayoutTopBarRight>
-			<AdminLayoutBody>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">{renderEditPage()}</Container>
-				</Container>
-			</AdminLayoutBody>
+			<AdminLayoutBody>{renderEditPage()}</AdminLayoutBody>
 		</AdminLayout>
 	);
 

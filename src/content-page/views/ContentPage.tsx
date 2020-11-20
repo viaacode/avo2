@@ -13,6 +13,7 @@ import { getUserGroupIds } from '../../authentication/authentication.service';
 import { InteractiveTour, LoadingErrorLoadedComponent, LoadingInfo } from '../../shared/components';
 import { CustomError } from '../../shared/helpers';
 import withUser, { UserProps } from '../../shared/hocs/withUser';
+import { ContentPageService } from '../../shared/services/content-page-service';
 
 import './ContentPage.scss';
 
@@ -24,7 +25,7 @@ type ContentPageDetailProps =
 	  }
 	| { path: string };
 
-const ContentPage: FunctionComponent<ContentPageDetailProps & UserProps> = props => {
+const ContentPage: FunctionComponent<ContentPageDetailProps & UserProps> = (props) => {
 	const [t] = useTranslation();
 	const [contentPageInfo, setContentPageInfo] = useState<ContentPageInfo | null>(null);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
@@ -33,7 +34,7 @@ const ContentPage: FunctionComponent<ContentPageDetailProps & UserProps> = props
 		try {
 			if ((props as any).path) {
 				setContentPageInfo(
-					await ContentService.fetchContentPageByPath((props as any).path)
+					await ContentPageService.getContentPageByPath((props as any).path)
 				);
 			} else if ((props as any).contentPageInfo) {
 				setContentPageInfo((props as any).contentPageInfo);
@@ -81,7 +82,7 @@ const ContentPage: FunctionComponent<ContentPageDetailProps & UserProps> = props
 
 		// images can have a setting to go full width
 		// so we need to set the block prop: fullWidth to true if we find an image block with size setting: pageWidth
-		contentBlockBlockConfigs = contentBlockBlockConfigs.map(contentBlockConfig => {
+		contentBlockBlockConfigs = contentBlockBlockConfigs.map((contentBlockConfig) => {
 			const width = (contentBlockConfig.components.state as BlockImageProps).width;
 			if (
 				contentBlockConfig.type === ContentBlockType.Image &&

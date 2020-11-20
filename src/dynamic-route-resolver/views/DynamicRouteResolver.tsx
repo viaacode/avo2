@@ -13,6 +13,7 @@ import { getPublishedDate } from '../../admin/content/helpers/get-published-stat
 import { ItemsService } from '../../admin/items/items.service';
 import { SpecialPermissionGroups } from '../../authentication/authentication.types';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
+import { redirectToErrorPage } from '../../authentication/helpers/redirects';
 import { getLoginStateAction } from '../../authentication/store/actions';
 import {
 	selectLogin,
@@ -24,6 +25,7 @@ import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
 import { ContentPage } from '../../content-page/views';
 import { ErrorView } from '../../error/views';
 import { LoadingErrorLoadedComponent, LoadingInfo } from '../../shared/components';
+import Html from '../../shared/components/Html/Html';
 import JsonLd from '../../shared/components/JsonLd/JsonLd';
 import {
 	buildLink,
@@ -34,9 +36,9 @@ import {
 } from '../../shared/helpers';
 import { ContentPageService } from '../../shared/services/content-page-service';
 import { AppState } from '../../store';
-import { GET_REDIRECTS } from '../dynamic-route-resolver.const';
+import { GET_ERROR_MESSAGES, GET_REDIRECTS } from '../dynamic-route-resolver.const';
 
-type DynamicRouteType = 'contentPage' | 'bundle' | 'notFound';
+type DynamicRouteType = 'contentPage' | 'bundle' | 'notFound' | 'depublishedContentPage';
 
 interface RouteInfo {
 	type: DynamicRouteType;
@@ -82,11 +84,17 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 			// Check if path is avo1 path that needs to be redirected
 			const redirects = GET_REDIRECTS();
 			const pathWithHash = pathname + location.hash;
-			const key: string | undefined = keys(redirects).find(key =>
+			const key: string | undefined = keys(redirects).find((key) =>
 				new RegExp(`^${key}$`, 'gi').test(pathWithHash)
 			);
 			if (key && redirects[key]) {
 				window.location.href = redirects[key];
+				return;
+			}
+
+			if (pathname === '/' && loginState.message === 'LOGGED_IN') {
+				// Redirect the logged out homepage to the logged in homepage is the user is logged in
+				history.replace('/start');
 				return;
 			}
 
@@ -101,7 +109,9 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 
 					if (itemExternalId) {
 						// Redirect to the new bundle url, since we want to discourage use of the old avo1 urls
-						history.push(buildLink(APP_PATH.ITEM_DETAIL.route, { id: itemExternalId }));
+						history.replace(
+							buildLink(APP_PATH.ITEM_DETAIL.route, { id: itemExternalId })
+						);
 						return;
 					} // else keep analysing
 
@@ -109,7 +119,9 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 					const bundleUuid = await CollectionService.fetchUuidByAvo1Id(avo1Id);
 					if (bundleUuid) {
 						// Redirect to the new bundle url, since we want to discourage use of the old avo1 urls
-						history.push(buildLink(APP_PATH.BUNDLE_DETAIL.route, { id: bundleUuid }));
+						history.replace(
+							buildLink(APP_PATH.BUNDLE_DETAIL.route, { id: bundleUuid })
+						);
 						return;
 					} // else keep analysing
 				}
@@ -118,7 +130,7 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 			// Check if path is old item id
 			if (/\/pid\/[^/]+/g.test(pathname)) {
 				const itemPid = (pathname.split('/').pop() || '').trim();
-				history.push(buildLink(APP_PATH.ITEM_DETAIL.route, { id: itemPid }));
+				history.replace(buildLink(APP_PATH.ITEM_DETAIL.route, { id: itemPid }));
 				return;
 			}
 
@@ -129,20 +141,31 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 				(loginState as any).userInfo &&
 				PermissionService.hasPerm((loginState as any).userInfo, PermissionName.SEARCH)
 			) {
-				history.push(generateSearchLinkString('serie', 'KLAAR', 'broadcastDate', 'desc'));
+				history.replace(
+					generateSearchLinkString('serie', 'KLAAR', 'broadcastDate', 'desc')
+				);
 				return;
 			}
 
 			// Check if path points to a content page
-			const contentPage: ContentPageInfo | null = await ContentPageService.getContentPageByPath(
-				pathname
-			);
-			if (!contentPage) {
-				setRouteInfo({ type: 'notFound', data: null });
-				return;
+			try {
+				const contentPage: ContentPageInfo | null = await ContentPageService.getContentPageByPath(
+					pathname
+				);
+				// Path is indeed a content page url
+				setRouteInfo({ type: 'contentPage', data: contentPage });
+			} catch (err) {
+				if (JSON.stringify(err).includes('CONTENT_PAGE_DEPUBLISHED')) {
+					const type = get(
+						err,
+						'innerException.additionalInfo.responseContent.additionalInfo.contentPageType'
+					);
+					setRouteInfo({ type: 'depublishedContentPage', data: { type } });
+				} else {
+					setRouteInfo({ type: 'notFound', data: null });
+				}
 			}
-			// Path is indeed a content page url
-			setRouteInfo({ type: 'contentPage', data: contentPage });
+
 			return;
 		} catch (err) {
 			console.error(
@@ -156,7 +179,7 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 				icon: 'search',
 			});
 		}
-	}, [loginState, location.pathname, setRouteInfo, setLoadingInfo, history, t]);
+	}, [loginState, location.pathname, location.hash, setRouteInfo, setLoadingInfo, history, t]);
 
 	// Check if current user is logged in
 	useEffect(() => {
@@ -169,15 +192,17 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 					loginState,
 				})
 			);
-			setLoadingInfo({
-				state: 'error',
-				message: t(
-					'dynamic-route-resolver/views/dynamic-route-resolver___er-ging-iets-mis-bij-het-inloggen'
-				),
-				actionButtons: ['home', 'helpdesk'],
-			});
+			redirectToErrorPage(
+				{
+					message: t(
+						'dynamic-route-resolver/views/dynamic-route-resolver___er-ging-iets-mis-bij-het-inloggen'
+					),
+					actionButtons: ['home', 'helpdesk'],
+				},
+				location
+			);
 		}
-	}, [getLoginState, loginState, loginStateError, loginStateLoading, t]);
+	}, [getLoginState, loginState, loginStateError, loginStateLoading, t, location]);
 
 	useEffect(() => {
 		if (loginState && location.pathname) {
@@ -229,12 +254,25 @@ const DynamicRouteResolver: FunctionComponent<DynamicRouteResolverProps> = ({
 						description={description}
 						image={get(routeInfo.data, 'thumbnail_path')}
 						isOrganisation={!!get(routeInfo.data, 'profile.organisation')}
-						author={getFullName(get(routeInfo.data, 'profile'))}
+						author={getFullName(get(routeInfo.data, 'profile'), true, false)}
 						publishedAt={getPublishedDate(routeInfo.data)}
 						updatedAt={get(routeInfo.data, 'updated_at')}
 					/>
 					<ContentPage contentPageInfo={routeInfo.data} />
 				</>
+			);
+		}
+		if (routeInfo && routeInfo.type === 'depublishedContentPage') {
+			return (
+				<ErrorView icon="clock" actionButtons={['home', 'helpdesk']} message="">
+					<Html
+						content={
+							GET_ERROR_MESSAGES()[`DEPUBLISHED_${routeInfo.data.type}`] ||
+							GET_ERROR_MESSAGES()[`DEPUBLISHED_PAGINA`]
+						}
+						sanitizePreset={'link'}
+					/>
+				</ErrorView>
 			);
 		}
 		console.error(

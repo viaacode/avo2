@@ -18,6 +18,7 @@ import { Avo } from '@viaa/avo2-types';
 
 import { FlowPlayerWrapper } from '../../../shared/components';
 import { CustomError, formatDurationHoursMinutesSeconds, toSeconds } from '../../../shared/helpers';
+import { getValidStartAndEnd } from '../../../shared/helpers/cut-start-and-end';
 import { ToastService } from '../../../shared/services';
 import { VideoStillService } from '../../../shared/services/video-stills-service';
 import { KeyCode } from '../../../shared/types';
@@ -32,7 +33,6 @@ interface CutFragmentModalProps {
 	index: number;
 	fragment: Avo.Collection.Fragment;
 	changeCollectionState: (action: CollectionAction) => void;
-	updateCuePoints: (cuepoints: any) => void;
 	onClose: () => void;
 }
 
@@ -42,20 +42,18 @@ const CutFragmentModal: FunctionComponent<CutFragmentModalProps> = ({
 	index,
 	fragment,
 	changeCollectionState,
-	updateCuePoints,
 	onClose,
 }) => {
 	const [t] = useTranslation();
 
 	// Save initial state for reusability purposes
-	const { start, end, startString, endString } = {
-		start: fragment.start_oc || 0,
-		end: fragment.end_oc || toSeconds(itemMetaData.duration, true) || 0,
-		startString: formatDurationHoursMinutesSeconds(fragment.start_oc || 0),
-		endString: formatDurationHoursMinutesSeconds(
-			fragment.end_oc || toSeconds(itemMetaData.duration, true) || 0
-		),
-	};
+	const [start, end] = getValidStartAndEnd(
+		fragment.start_oc,
+		fragment.end_oc,
+		toSeconds(itemMetaData.duration)
+	);
+	const startString = formatDurationHoursMinutesSeconds(start);
+	const endString = formatDurationHoursMinutesSeconds(end);
 	const itemMeta = fragment.item_meta as Avo.Item.Item;
 
 	const [fragmentStart, setFragmentStart] = useState<number>(start);
@@ -120,9 +118,18 @@ const CutFragmentModal: FunctionComponent<CutFragmentModalProps> = ({
 			});
 		}
 
-		updateCuePoints({
-			start: startTime,
-			end: endTime,
+		changeCollectionState({
+			index,
+			type: 'UPDATE_FRAGMENT_PROP',
+			fragmentProp: 'start_oc',
+			fragmentPropValue: startTime,
+		});
+
+		changeCollectionState({
+			index,
+			type: 'UPDATE_FRAGMENT_PROP',
+			fragmentProp: 'end_oc',
+			fragmentPropValue: endTime,
 		});
 		onClose();
 	};

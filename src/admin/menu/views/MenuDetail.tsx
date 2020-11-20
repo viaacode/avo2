@@ -7,7 +7,6 @@ import {
 	Button,
 	ButtonGroup,
 	ButtonToolbar,
-	Container,
 	Flex,
 	IconName,
 	Spacer,
@@ -24,6 +23,7 @@ import {
 } from '../../../shared/components';
 import { CustomError, navigate } from '../../../shared/helpers';
 import { ToastService } from '../../../shared/services';
+import { ADMIN_PATH } from '../../admin.const';
 import { AdminLayout, AdminLayoutBody, AdminLayoutTopBarRight } from '../../shared/layouts';
 import { MENU_PATH } from '../menu.const';
 import { MenuService } from '../menu.service';
@@ -97,16 +97,14 @@ const MenuDetail: FunctionComponent<MenuDetailProps> = ({ history, match }) => {
 			await MenuService.deleteMenuItem(idToDelete);
 			fetchMenuItems();
 			ToastService.success(
-				t('admin/menu/views/menu-detail___het-navigatie-item-is-succesvol-verwijderd'),
-				false
+				t('admin/menu/views/menu-detail___het-navigatie-item-is-succesvol-verwijderd')
 			);
 		} catch (err) {
 			console.error(new CustomError('Failed to delete menu item', err, { idToDelete }));
 			ToastService.danger(
 				t(
 					'admin/menu/views/menu-detail___het-verwijderen-van-het-navigatie-item-is-mislukt'
-				),
-				false
+				)
 			);
 		}
 	};
@@ -126,14 +124,12 @@ const MenuDetail: FunctionComponent<MenuDetailProps> = ({ history, match }) => {
 
 			fetchMenuItems();
 			ToastService.success(
-				t('admin/menu/views/menu-detail___de-navigatie-items-zijn-succesvol-opgeslagen'),
-				false
+				t('admin/menu/views/menu-detail___de-navigatie-items-zijn-succesvol-opgeslagen')
 			);
 		} catch (err) {
 			console.error(new CustomError('Failed to update menu items', err, { menuItems }));
 			ToastService.danger(
-				t('admin/menu/views/menu-detail___het-opslaan-van-de-navigatie-items-is-mislukt'),
-				false
+				t('admin/menu/views/menu-detail___het-opslaan-van-de-navigatie-items-is-mislukt')
 			);
 		}
 	};
@@ -201,10 +197,9 @@ const MenuDetail: FunctionComponent<MenuDetailProps> = ({ history, match }) => {
 		// Return to overview if menu is empty
 		if (!menuItems) {
 			ToastService.danger(
-				t('admin/menu/views/menu-detail___er-werden-geen-navigatie-items-gevonden'),
-				false
+				t('admin/menu/views/menu-detail___er-werden-geen-navigatie-items-gevonden')
 			);
-			handleNavigate(MENU_PATH.MENU);
+			handleNavigate(MENU_PATH.MENU_OVERVIEW);
 			return null;
 		}
 
@@ -212,12 +207,17 @@ const MenuDetail: FunctionComponent<MenuDetailProps> = ({ history, match }) => {
 		const isLast = (i: number) => i === menuItems.length - 1;
 
 		return (
-			<AdminLayout className="c-menu-detail" showBackButton pageTitle={startCase(menuId)}>
+			<AdminLayout
+				onClickBackButton={() => navigate(history, ADMIN_PATH.MENU_OVERVIEW)}
+				className="c-menu-detail"
+				pageTitle={startCase(menuId)}
+				size="full-width"
+			>
 				<AdminLayoutTopBarRight>
 					<ButtonToolbar>
 						<Button
 							label={t('admin/menu/views/menu-detail___annuleer')}
-							onClick={() => handleNavigate(MENU_PATH.MENU)}
+							onClick={() => handleNavigate(MENU_PATH.MENU_OVERVIEW)}
 							type="tertiary"
 						/>
 						<Button
@@ -228,99 +228,88 @@ const MenuDetail: FunctionComponent<MenuDetailProps> = ({ history, match }) => {
 					</ButtonToolbar>
 				</AdminLayoutTopBarRight>
 				<AdminLayoutBody>
-					<Container mode="vertical" size="small">
-						<Container mode="horizontal">
-							<Table align className="c-menu-detail__table" variant="styled">
-								<tbody>
-									{menuItems.map((item, index) => (
-										<tr
-											key={`nav-edit-${item.id}`}
-											className={
-												activeRow === item.id
-													? 'c-menu-detail__table-row--active'
-													: ''
-											}
-										>
-											<td className="o-table-col-1">
-												<ButtonGroup>
-													{renderReorderButton(
-														'up',
-														index,
-														item.id,
-														isFirst(index)
-													)}
-													{renderReorderButton(
-														'down',
-														index,
-														item.id,
-														isLast(index)
-													)}
-												</ButtonGroup>
-											</td>
-											<td>
-												{item.label || item.tooltip || item.content_path}
-											</td>
-											<td>
-												<ButtonToolbar>
-													<Button
-														icon="edit-2"
-														onClick={() =>
-															handleNavigate(
-																MENU_PATH.MENU_ITEM_EDIT,
-																{
-																	menu: menuId,
-																	id: String(item.id),
-																}
-															)
-														}
-														title={t(
-															'admin/menu/views/menu-detail___bewerk-dit-navigatie-item'
-														)}
-														ariaLabel={t(
-															'admin/menu/views/menu-detail___bewerk-dit-navigatie-item'
-														)}
-														type="secondary"
-													/>
-													<Button
-														icon="delete"
-														title={t(
-															'admin/menu/views/menu-detail___verwijder-dit-navigatie-item'
-														)}
-														ariaLabel={t(
-															'admin/menu/views/menu-detail___verwijder-dit-navigatie-item'
-														)}
-														onClick={() => openConfirmModal(item.id)}
-														type="danger-hover"
-													/>
-												</ButtonToolbar>
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</Table>
-							<Spacer margin="top">
-								<Flex center>
-									<Button
-										icon="plus"
-										label={t(
-											'admin/menu/views/menu-detail___voeg-een-item-toe'
-										)}
-										onClick={() =>
-											handleNavigate(MENU_PATH.MENU_ITEM_CREATE, {
-												menu: menuId,
-											})
-										}
-										type="primary"
-									/>
-								</Flex>
-							</Spacer>
-							<DeleteObjectModal
-								deleteObjectCallback={() => handleDelete()}
-								isOpen={isConfirmModalOpen}
-								onClose={() => setIsConfirmModalOpen(false)}
+					<Table align className="c-menu-detail__table" variant="styled">
+						<tbody>
+							{menuItems.map((item, index) => (
+								<tr
+									key={`nav-edit-${item.id}`}
+									className={
+										activeRow === item.id
+											? 'c-menu-detail__table-row--active'
+											: ''
+									}
+								>
+									<td className="o-table-col-1">
+										<ButtonGroup>
+											{renderReorderButton(
+												'up',
+												index,
+												item.id,
+												isFirst(index)
+											)}
+											{renderReorderButton(
+												'down',
+												index,
+												item.id,
+												isLast(index)
+											)}
+										</ButtonGroup>
+									</td>
+									<td>{item.label || item.tooltip || item.content_path}</td>
+									<td>
+										<ButtonToolbar>
+											<Button
+												icon="edit-2"
+												onClick={() =>
+													handleNavigate(MENU_PATH.MENU_ITEM_EDIT, {
+														menu: menuId,
+														id: String(item.id),
+													})
+												}
+												title={t(
+													'admin/menu/views/menu-detail___bewerk-dit-navigatie-item'
+												)}
+												ariaLabel={t(
+													'admin/menu/views/menu-detail___bewerk-dit-navigatie-item'
+												)}
+												type="secondary"
+											/>
+											<Button
+												icon="delete"
+												title={t(
+													'admin/menu/views/menu-detail___verwijder-dit-navigatie-item'
+												)}
+												ariaLabel={t(
+													'admin/menu/views/menu-detail___verwijder-dit-navigatie-item'
+												)}
+												onClick={() => openConfirmModal(item.id)}
+												type="danger-hover"
+											/>
+										</ButtonToolbar>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</Table>
+					<Spacer margin="top">
+						<Flex center>
+							<Button
+								icon="plus"
+								label={t('admin/menu/views/menu-detail___voeg-een-item-toe')}
+								onClick={() =>
+									handleNavigate(MENU_PATH.MENU_ITEM_CREATE, {
+										menu: menuId,
+									})
+								}
+								type="primary"
 							/>
-						</Container>
-					</Container>
+						</Flex>
+					</Spacer>
+					<DeleteObjectModal
+						deleteObjectCallback={handleDelete}
+						isOpen={isConfirmModalOpen}
+						onClose={() => setIsConfirmModalOpen(false)}
+					/>
 				</AdminLayoutBody>
 			</AdminLayout>
 		);

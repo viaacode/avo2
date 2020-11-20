@@ -1,28 +1,34 @@
 import { History } from 'history';
-import { fromPairs, get, isArray, isEmpty, isNil, map, noop } from 'lodash-es';
+import { fromPairs, get, isArray, isEmpty, isNil, isString, map, noop } from 'lodash-es';
 import queryString from 'query-string';
-import React, { Fragment } from 'react';
+import React, { Fragment, ReactElement, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
-import { ButtonAction, LinkTarget } from '@viaa/avo2-components';
+import { ButtonAction, ContentPickerType, LinkTarget } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
 import { BUNDLE_PATH } from '../../bundle/bundle.const';
 import { APP_PATH, CONTENT_TYPE_TO_ROUTE } from '../../constants';
+import SmartLink from '../components/SmartLink/SmartLink';
 import { ToastService } from '../services';
 import i18n from '../translations/i18n';
 
 import { getEnv } from './env';
+import { insideIframe } from './inside-iframe';
 
 type RouteParams = { [key: string]: string | number | undefined };
 
-const getMissingParams = (route: string): string[] => route.split('/').filter(r => r.match(/^:/));
+const getMissingParams = (route: string): string[] => route.split('/').filter((r) => r.match(/^:/));
 const navigationConsoleError = (route: string, missingParams: string[] = []) => {
 	const paramsString = missingParams.join(', ');
 	console.error(`The following params were not included: [${paramsString}] for route ${route}`);
 };
 
-export const buildLink = (route: string, params: RouteParams = {}, search?: string): string => {
+export const buildLink = (
+	route: string,
+	params: RouteParams = {},
+	search?: string | { [paramName: string]: string }
+): string => {
 	let builtLink = route;
 
 	// Replace url with given params
@@ -40,7 +46,9 @@ export const buildLink = (route: string, params: RouteParams = {}, search?: stri
 	}
 
 	// Add search query if present
-	return search ? `${builtLink}?${search}` : builtLink;
+	return search
+		? `${builtLink}?${isString(search) ? search : queryString.stringify(search)}`
+		: builtLink;
 };
 
 export const navigate = (
@@ -75,6 +83,7 @@ export const navigate = (
 	history.push(builtLink);
 };
 
+// TODO see if we can replace this method completely by the new SmartLink component
 export function navigateToAbsoluteOrRelativeUrl(
 	url: string,
 	history: History,
@@ -84,55 +93,73 @@ export function navigateToAbsoluteOrRelativeUrl(
 	if (url.startsWith('www.')) {
 		fullUrl = `//${url}`;
 	}
-	if (target === LinkTarget.Self) {
-		if (fullUrl.includes('//')) {
-			// absolute url
-			window.location.href = fullUrl;
-		} else {
-			// relative url
-			history.push(fullUrl);
-		}
-	} else {
-		if (fullUrl.includes('//')) {
-			// absolute fullUrl
-			window.open(fullUrl);
-		} else {
-			// relative url
-			window.open(`${window.location.origin}${fullUrl}`);
-		}
+	switch (target) {
+		case LinkTarget.Self:
+			if (fullUrl.includes('//')) {
+				// absolute url
+				window.location.href = fullUrl;
+			} else {
+				// relative url
+				history.push(fullUrl);
+			}
+			break;
+
+		case LinkTarget.Blank:
+		default:
+			if (fullUrl.includes('//')) {
+				// absolute fullUrl
+				window.open(fullUrl);
+			} else {
+				// relative url
+				window.open(`${window.location.origin}${fullUrl}`);
+			}
+			break;
 	}
 }
+
+export const generateSmartLink = (
+	action: ButtonAction | null | undefined,
+	children: ReactNode
+): ReactElement<any, any> | null => {
+	return <SmartLink action={action}>{children}</SmartLink>;
+};
 
 export const navigateToContentType = (action: ButtonAction, history: History) => {
 	if (action) {
 		const { type, value, target } = action;
 
-		switch (type as Avo.Core.ContentPickerType) {
+		let resolvedTarget = target;
+		if (insideIframe()) {
+			// Klaar page inside smartschool iframe must open all links in new window: https://meemoo.atlassian.net/browse/AVO-1354
+			resolvedTarget = LinkTarget.Blank;
+		}
+
+		switch (type as ContentPickerType) {
 			case 'INTERNAL_LINK':
 			case 'CONTENT_PAGE':
 			case 'PROJECTS':
-				navigateToAbsoluteOrRelativeUrl(String(value), history, target);
+				navigateToAbsoluteOrRelativeUrl(String(value), history, resolvedTarget);
 				break;
 
 			case 'COLLECTION':
 				const collectionUrl = buildLink(APP_PATH.COLLECTION_DETAIL.route, {
 					id: value as string,
 				});
-				navigateToAbsoluteOrRelativeUrl(collectionUrl, history, target);
+				navigateToAbsoluteOrRelativeUrl(collectionUrl, history, resolvedTarget);
 				break;
 
 			case 'ITEM':
 				const itemUrl = buildLink(APP_PATH.ITEM_DETAIL.route, {
 					id: value,
 				});
-				navigateToAbsoluteOrRelativeUrl(itemUrl, history, target);
+				navigateToAbsoluteOrRelativeUrl(itemUrl, history, resolvedTarget);
 				break;
 
 			case 'BUNDLE':
 				const bundleUrl = buildLink(BUNDLE_PATH.BUNDLE_DETAIL, {
 					id: value,
 				});
-				navigateToAbsoluteOrRelativeUrl(bundleUrl, history, target);
+				navigateToAbsoluteOrRelativeUrl(bundleUrl, history, resolvedTarget);
 				break;
 
 			case 'EXTERNAL_LINK':
@@ -140,7 +167,7 @@ export const navigateToContentType = (action: ButtonAction, history: History) =>
 					'{{PROXY_URL}}',
 					getEnv('PROXY_URL') || ''
 				);
-				navigateToAbsoluteOrRelativeUrl(externalUrl, history, target);
+				navigateToAbsoluteOrRelativeUrl(externalUrl, history, resolvedTarget);
 				break;
 
 			case 'ANCHOR_LINK':
@@ -148,8 +175,12 @@ export const navigateToContentType = (action: ButtonAction, history: History) =>
 				navigateToAbsoluteOrRelativeUrl(
 					`${urlWithoutQueryOrAnchor}#${value}`,
 					history,
-					target
+					resolvedTarget
 				);
+				break;
+
+			case 'FILE':
+				navigateToAbsoluteOrRelativeUrl(value as string, history, LinkTarget.Blank);
 				break;
 
 			case 'SEARCH_QUERY':
@@ -168,7 +199,7 @@ export const navigateToContentType = (action: ButtonAction, history: History) =>
 						)
 					),
 					history,
-					target
+					resolvedTarget
 				);
 				break;
 

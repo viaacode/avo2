@@ -8,14 +8,16 @@ export const GET_USER_GROUP_BY_ID = gql`
 			description
 			created_at
 			updated_at
-			group_user_permission_groups {
+			group_user_permission_groups(order_by: { permission_group: { label: asc } }) {
 				permission_group {
 					label
 					id
 					created_at
 					description
 					updated_at
-					permission_group_user_permissions {
+					permission_group_user_permissions(
+						order_by: { permission: { description: asc } }
+					) {
 						permission {
 							label
 							description
@@ -28,7 +30,7 @@ export const GET_USER_GROUP_BY_ID = gql`
 	}
 `;
 
-export const GET_USER_GROUPS = gql`
+export const GET_USER_GROUPS_WITH_FILTERS = gql`
 	query getUserGroups(
 		$limit: Int!
 		$offset: Int!

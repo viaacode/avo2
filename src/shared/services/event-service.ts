@@ -5,12 +5,7 @@ import { Avo } from '@viaa/avo2-types';
 import { CustomError } from '../helpers';
 
 import { dataService } from './data-service';
-import {
-	INSERT_COLLECTION_BOOKMARK,
-	INSERT_ITEM_BOOKMARK,
-	// INSERT_ITEM_PLAY,
-	// INSERT_ITEM_VIEW,
-} from './event-service.gql';
+import { INSERT_COLLECTION_BOOKMARK, INSERT_ITEM_BOOKMARK } from './event-service.gql';
 
 const EVENT_QUERIES = {
 	bookmark: {
@@ -33,28 +28,6 @@ const EVENT_QUERIES = {
 			}),
 		},
 	},
-	// view: {
-	// 	item: {
-	// 		query: INSERT_ITEM_VIEW,
-	// 		variables: (contentId: string, profileId: string) => ({
-	// 			Item: {
-	// 				item_id: contentId,
-	// 				profile_id: profileId,
-	// 			},
-	// 		}),
-	// 	},
-	// },
-	// play: {
-	// 	item: {
-	// 		query: INSERT_ITEM_PLAY,
-	// 		variables: (contentId: string, profileId: string) => ({
-	// 			bookmarkItem: {
-	// 				item_id: contentId,
-	// 				profile_id: profileId,
-	// 			},
-	// 		}),
-	// 	},
-	// },
 };
 
 export async function trackEvent(

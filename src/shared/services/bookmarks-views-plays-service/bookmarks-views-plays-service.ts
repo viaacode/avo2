@@ -1,12 +1,15 @@
-import { compact, fromPairs, get, groupBy } from 'lodash-es';
+import { compact, fromPairs, get, groupBy, isNil } from 'lodash-es';
 
+import { EnglishContentType } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-import { ContentTypeNumber } from '../../../collection/collection.types';
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { ContentTypeNumber, toDutchContentType } from '../../../collection/collection.types';
 import { DEFAULT_AUDIO_STILL } from '../../constants';
 import { CustomError, normalizeTimestamp } from '../../helpers';
 import i18n from '../../translations/i18n';
 import { ApolloCacheManager, dataService } from '../data-service';
+import { trackEvents } from '../event-logging-service';
 import { ToastService } from '../toast-service';
 
 import { EVENT_QUERIES } from './bookmarks-views-plays-service.const';
@@ -28,8 +31,8 @@ import {
 	EventAction,
 	EventContentType,
 	EventContentTypeSimplified,
-	EventInitAction,
 	GetBookmarksForUserResponse,
+	QueryType,
 } from './bookmarks-views-plays-service.types';
 
 export class BookmarksViewsPlaysService {
@@ -41,43 +44,32 @@ export class BookmarksViewsPlaysService {
 		silent: boolean = true
 	): Promise<void> {
 		try {
-			// bundle is handled the same way as a collection
-			const contentTypeSimplified = contentType === 'bundle' ? 'collection' : contentType;
+			if (action === 'play' || action === 'view') {
+				const count = await this.getCount(action, contentType, contentUuid, user, silent);
 
-			const mutation = get(EVENT_QUERIES, [action, contentTypeSimplified, 'query']);
-			const variables = get(
-				EVENT_QUERIES,
-				[action, contentTypeSimplified, 'variables'],
-				() => {}
-			)(contentUuid, get(user, 'profile.id'));
-			if (!mutation || !variables) {
-				throw new CustomError('Failed to find query/variables in query lookup table');
-			}
-
-			const response = await dataService.mutate({
-				mutation,
-				variables,
-				update: ApolloCacheManager.clearBookmarksViewsPlays,
-			});
-
-			if (response.errors) {
-				throw new CustomError('Graphql errors', null, { errors: response.errors });
-			}
-
-			if (
-				response.data &&
-				get(response, ['data', Object.keys(response.data)[0], 'affected_rows']) === 0
-			) {
-				if (action === 'play' || action === 'view') {
+				if (isNil(count)) {
 					// No row exists yet that can be increased, we should add a row with count = 1
-					this.insertInitialCount(
-						`${action}Init` as EventInitAction,
-						contentType,
-						contentUuid,
-						user,
-						silent
-					);
+					await this.insertInitialCount(action, contentType, contentUuid, user, silent);
 				} else {
+					await this.incrementCount(action, contentType, contentUuid, user, silent);
+				}
+			} else {
+				// Bookmark or unbookmark action
+				const { query, variables } = this.getQueryAndVariables(
+					action,
+					'query',
+					contentType,
+					contentUuid,
+					user
+				);
+
+				const response = await dataService.mutate({
+					mutation: query,
+					variables,
+					update: ApolloCacheManager.clearBookmarksViewsPlays,
+				});
+
+				if (response.errors) {
 					// Bookmark related action failed
 					console.error('Failed to store action into the database', null, {
 						response,
@@ -160,7 +152,7 @@ export class BookmarksViewsPlaysService {
 	 * @param contentId
 	 * @param user
 	 * @param type
-	 * @param isBookmarked
+	 * @param isBookmarked current state of the bookmark toggle before the desired action is executed
 	 * @return {boolean} returns true of the operation was successful, otherwise false
 	 */
 	public static async toggleBookmark(
@@ -184,6 +176,20 @@ export class BookmarksViewsPlaysService {
 				user,
 				false
 			);
+
+			if (!isBookmarked) {
+				trackEvents(
+					{
+						object: contentId,
+						object_type: type,
+						message: `${getProfileName(user)} heeft een ${toDutchContentType(
+							type
+						)} gebookmarked`,
+						action: 'bookmark',
+					},
+					user
+				);
+			}
 		} catch (err) {
 			throw new CustomError('Failed to bookmark/unbookmark the item', err, { contentId });
 		}
@@ -219,15 +225,14 @@ export class BookmarksViewsPlaysService {
 				return {
 					contentId: itemBookmark.item_id,
 					contentLinkId: itemBookmark.bookmarkedItem.item.external_id,
-					contentType: 'item',
-					createdAt: normalizeTimestamp(itemBookmark.created_at)
-						.toDate()
-						.getTime(),
+					contentType: itemBookmark.bookmarkedItem.item.item_meta.type
+						.label as EnglishContentType,
+					createdAt: normalizeTimestamp(itemBookmark.created_at).toDate().getTime(),
 					contentTitle: itemBookmark.bookmarkedItem.title,
 					contentThumbnailPath: thumbnailPath,
-					contentCreatedAt: normalizeTimestamp(itemBookmark.bookmarkedItem.issued)
-						.toDate()
-						.getTime(),
+					contentCreatedAt: itemBookmark.bookmarkedItem.issued
+						? normalizeTimestamp(itemBookmark.bookmarkedItem.issued).toDate().getTime()
+						: null,
 					contentViews: get(itemBookmark, 'bookmarkedItem.view_counts[0].count') || 0,
 				};
 			}
@@ -245,9 +250,7 @@ export class BookmarksViewsPlaysService {
 						ContentTypeNumber.collection
 							? 'collection'
 							: 'bundle',
-					createdAt: normalizeTimestamp(collectionBookmark.created_at)
-						.toDate()
-						.getTime(),
+					createdAt: normalizeTimestamp(collectionBookmark.created_at).toDate().getTime(),
 					contentTitle: collectionBookmark.bookmarkedCollection.title,
 					contentThumbnailPath: collectionBookmark.bookmarkedCollection.thumbnail_path,
 					contentCreatedAt: normalizeTimestamp(
@@ -261,6 +264,34 @@ export class BookmarksViewsPlaysService {
 			}
 		);
 		return [...compact(itemBookmarkInfos), ...compact(collectionBookmarkInfos)];
+	}
+
+	private static getQueryAndVariables(
+		action: EventAction,
+		queryType: QueryType,
+		contentType: EventContentType,
+		contentUuid: string,
+		user: Avo.User.User | undefined
+	) {
+		// bundle is handled the same way as a collection
+		const contentTypeSimplified = contentType === 'bundle' ? 'collection' : contentType;
+
+		const query = get(EVENT_QUERIES, [action, contentTypeSimplified, queryType]);
+		const getVariablesFunc = get(
+			EVENT_QUERIES,
+			[action, contentTypeSimplified, 'variables'],
+			() => {}
+		);
+		const variables = getVariablesFunc(contentUuid, user);
+		if (!query || !variables) {
+			throw new CustomError('Failed to find query/variables in query lookup table');
+		}
+		const responsePath = get(EVENT_QUERIES, [
+			action,
+			contentTypeSimplified,
+			'responsePath',
+		]) as string;
+		return { query, variables, responsePath };
 	}
 
 	public static async getMultipleViewCounts(
@@ -280,30 +311,65 @@ export class BookmarksViewsPlaysService {
 		);
 	}
 
-	private static async insertInitialCount(
-		action: EventInitAction,
+	private static async getCount(
+		action: EventAction,
 		contentType: EventContentType,
 		contentUuid: string,
 		user?: Avo.User.User,
 		silent: boolean = true
 	) {
 		try {
-			// bundle is handled the same way as a collection
-			const contentTypeSimplified = contentType === 'bundle' ? 'collection' : contentType;
+			const { query, variables, responsePath } = this.getQueryAndVariables(
+				action,
+				'get',
+				contentType,
+				contentUuid,
+				user
+			);
 
-			const mutation = get(EVENT_QUERIES, [action, contentTypeSimplified, 'query']);
-			const geVariablesFunc = get(
-				EVENT_QUERIES,
-				[action, contentTypeSimplified, 'variables'],
-				() => {}
-			) as (uuid: string) => any;
-			const variables = geVariablesFunc(contentUuid);
-			if (!mutation || !variables) {
-				throw new CustomError('Failed to find query/variables in query lookup table');
+			const response = await dataService.query({
+				query,
+				variables,
+			});
+
+			if (response.errors) {
+				throw new CustomError('Graphql errors', null, { errors: response.errors });
 			}
 
+			return get(response, responsePath, null);
+		} catch (err) {
+			const error = new CustomError('Failed to get view/play count from the database', err, {
+				action,
+				contentType,
+				contentUuid,
+				user,
+			});
+			if (silent) {
+				console.error(error);
+			} else {
+				throw error;
+			}
+		}
+	}
+
+	private static async insertInitialCount(
+		action: EventAction,
+		contentType: EventContentType,
+		contentUuid: string,
+		user?: Avo.User.User,
+		silent: boolean = true
+	) {
+		try {
+			const { query, variables } = this.getQueryAndVariables(
+				action,
+				'init',
+				contentType,
+				contentUuid,
+				user
+			);
+
 			const response = await dataService.mutate({
-				mutation,
+				mutation: query,
 				variables,
 				update: ApolloCacheManager.clearBookmarksViewsPlays,
 			});
@@ -314,6 +380,50 @@ export class BookmarksViewsPlaysService {
 		} catch (err) {
 			const error = new CustomError(
 				'Failed to initialize view/play count in the database',
+				err,
+				{
+					action,
+					contentType,
+					contentUuid,
+					user,
+				}
+			);
+			if (silent) {
+				console.error(error);
+			} else {
+				throw error;
+			}
+		}
+	}
+
+	private static async incrementCount(
+		action: EventAction,
+		contentType: EventContentType,
+		contentUuid: string,
+		user?: Avo.User.User,
+		silent: boolean = true
+	) {
+		try {
+			const { query, variables } = this.getQueryAndVariables(
+				action,
+				'increment',
+				contentType,
+				contentUuid,
+				user
+			);
+
+			const response = await dataService.mutate({
+				mutation: query,
+				variables,
+				update: ApolloCacheManager.clearBookmarksViewsPlays,
+			});
+
+			if (response.errors) {
+				throw new CustomError('Graphql errors', null, { errors: response.errors });
+			}
+		} catch (err) {
+			const error = new CustomError(
+				'Failed to increment view/play count in the database',
 				err,
 				{
 					action,
@@ -360,9 +470,9 @@ export class BookmarksViewsPlaysService {
 				groupedObjectInfos['collection'] || [];
 
 			// Get list of item ids and collection ids from the object infos
-			const itemUuids: string[] = itemObjectInfos.map(objectInfo => objectInfo.uuid);
+			const itemUuids: string[] = itemObjectInfos.map((objectInfo) => objectInfo.uuid);
 			const collectionUuids: string[] = collectionObjectInfos.map(
-				objectInfo => objectInfo.uuid
+				(objectInfo) => objectInfo.uuid
 			);
 			const response = await dataService.query({
 				query: GET_BOOKMARK_STATUSES,
@@ -386,12 +496,12 @@ export class BookmarksViewsPlaysService {
 			// if the id was found we set the isBookmarked status to true
 			// if the id was not found we set the isBookmarked status to false
 			const itemBookmarkStatuses: { [uuid: string]: boolean } = fromPairs(
-				itemObjectInfos.map(objectInfo => {
+				itemObjectInfos.map((objectInfo) => {
 					return [objectInfo.uuid, itemBookmarkIds.includes(objectInfo.uuid)];
 				})
 			);
 			const collectionBookmarkStatuses: { [uuid: string]: boolean } = fromPairs(
-				collectionObjectInfos.map(objectInfo => {
+				collectionObjectInfos.map((objectInfo) => {
 					return [objectInfo.uuid, collectionBookmarkIds.includes(objectInfo.uuid)];
 				})
 			);

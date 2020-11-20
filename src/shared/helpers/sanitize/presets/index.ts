@@ -55,10 +55,12 @@ const full = {
 
 export type SanitizePreset = 'basic' | 'link' | 'full';
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 const presetLookup: { [preset in SanitizePreset]: any } = {
 	basic,
 	link,
 	full,
 };
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export default presetLookup;

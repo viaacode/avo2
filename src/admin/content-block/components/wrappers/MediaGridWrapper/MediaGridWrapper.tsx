@@ -4,18 +4,21 @@ import { useTranslation } from 'react-i18next';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import { compose } from 'redux';
 
-import { BlockMediaList, ButtonAction, MediaListItem } from '@viaa/avo2-components';
+import {
+	BlockMediaGrid,
+	ButtonAction,
+	MediaListItem,
+	RenderLinkFunction,
+} from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
-import { ContentTypeNumber } from '../../../../../collection/collection.types';
+import {
+	ContentTypeString,
+	toEnglishContentType,
+} from '../../../../../collection/collection.types';
 import { ItemVideoDescription } from '../../../../../item/components';
 import { LoadingErrorLoadedComponent, LoadingInfo } from '../../../../../shared/components';
-import {
-	CustomError,
-	formatDate,
-	isMobileWidth,
-	navigateToContentType,
-} from '../../../../../shared/helpers';
+import { formatDate, isMobileWidth } from '../../../../../shared/helpers';
 import { parseIntOrDefault } from '../../../../../shared/helpers/parsers/number';
 import withUser, { UserProps } from '../../../../../shared/hocs/withUser';
 import { ContentPageService } from '../../../../../shared/services/content-page-service';
@@ -28,11 +31,12 @@ interface MediaGridWrapperProps extends MediaGridBlockState {
 	searchQueryLimit: string;
 	elements: { mediaItem: ButtonAction }[];
 	results: ResolvedItemOrCollection[];
+	renderLink?: RenderLinkFunction;
 }
 
-const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
-	RouteComponentProps &
-	UserProps> = ({
+const MediaGridWrapper: FunctionComponent<
+	MediaGridWrapperProps & RouteComponentProps & UserProps
+> = ({
 	title,
 	buttonLabel,
 	buttonAction,
@@ -53,13 +57,17 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 	searchQueryLimit,
 	elements,
 	results,
-	history,
 	user,
+	renderLink,
 }) => {
 	const [t] = useTranslation();
 
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [resolvedResults, setResolvedResults] = useState<ResolvedItemOrCollection[] | null>(null);
+
+	// cache search results
+	const [lastSearchQuery, setLastSearchQuery] = useState<string | null>(null);
+	const [lastSearchQueryLimit, setLastSearchQueryLimit] = useState<number | null>(null);
 
 	const resolveMediaResults = useCallback(async () => {
 		try {
@@ -76,13 +84,43 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 			if (user) {
 				// If we are logged in and get no results, but we do get elements, then the block is loaded in preview mode,
 				// and we should resolve the results ourselves using a separate route on the server
-				setResolvedResults(
-					await ContentPageService.resolveMediaItems(
-						get(searchQuery, 'value') as string | undefined,
-						parseIntOrDefault<undefined>(searchQueryLimit, undefined),
-						elements.filter(element => !isEmpty(element) && element.mediaItem)
-					)
-				);
+				const searchQueryLimitNumber =
+					parseIntOrDefault<undefined>(searchQueryLimit, undefined) || 8;
+				const searchQueryValue = get(searchQuery, 'value') as string | undefined;
+
+				if (
+					searchQueryValue !== lastSearchQuery ||
+					searchQueryLimitNumber > (lastSearchQueryLimit || 0)
+				) {
+					// Only fetch items from the server if the search query changed or if the number of items increased
+					setLastSearchQuery(searchQueryValue || null);
+					setLastSearchQueryLimit(searchQueryLimitNumber);
+					const searchResults = await ContentPageService.resolveMediaItems(
+						searchQueryValue,
+						searchQueryLimitNumber,
+						elements.filter((element) => !isEmpty(element) && element.mediaItem)
+					);
+
+					setResolvedResults((r) => {
+						if (
+							r &&
+							r.length &&
+							searchResults.length !== (searchQueryLimitNumber || 8)
+						) {
+							// older request that we should ignore
+							return r;
+						}
+						return searchResults;
+					});
+				} else if (
+					searchQueryValue === lastSearchQuery ||
+					searchQueryLimitNumber < (lastSearchQueryLimit || 0)
+				) {
+					// If the next query requests less items, we can resolve it without going to the server
+					// by just trimming the items in the cache
+					setResolvedResults((r) => (r || []).slice(0, searchQueryLimitNumber));
+					setLastSearchQueryLimit(searchQueryLimitNumber);
+				}
 			}
 		} catch (err) {
 			setLoadingInfo({
@@ -99,6 +137,8 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 		user,
 		searchQuery,
 		searchQueryLimit,
+		lastSearchQuery,
+		lastSearchQueryLimit,
 		setResolvedResults,
 		setLoadingInfo,
 		t,
@@ -118,12 +158,11 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 		itemOrCollection: ResolvedItemOrCollection,
 		index: number
 	): MediaListItem => {
-		const isItem =
-			get(itemOrCollection, 'type.label') === 'video' ||
-			get(itemOrCollection, 'type.label') === 'audio';
-		const isCollection = get(itemOrCollection, 'type.id') === ContentTypeNumber.collection;
-		const itemDuration = get(itemOrCollection, 'duration', 0);
 		const itemLabel = get(itemOrCollection, 'type.label', 'item');
+		const isItem =
+			itemLabel === ContentTypeString.video || itemLabel === ContentTypeString.audio;
+		const isCollection = itemLabel === ContentTypeString.collection;
+		const itemDuration = get(itemOrCollection, 'duration', 0);
 		const collectionItems = get(
 			itemOrCollection,
 			'collection_fragments_aggregate.aggregate.count',
@@ -134,7 +173,11 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 		const element: MediaGridBlockComponentState = (elements || [])[index] || ({} as any);
 
 		return {
-			category: isItem ? itemLabel : 'collection',
+			category: isItem
+				? itemLabel
+				: isCollection
+				? toEnglishContentType(ContentTypeString.collection)
+				: toEnglishContentType(ContentTypeString.bundle),
 			metadata: [
 				{ icon: 'eye', label: String(viewCount || 0) },
 				{ label: formatDate(itemOrCollection.created_at) },
@@ -146,7 +189,7 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 				element.mediaItem ||
 				({
 					type: isItem ? 'ITEM' : isCollection ? 'COLLECTION' : 'BUNDLE',
-					value: itemOrCollection.external_id,
+					value: itemOrCollection.external_id || itemOrCollection.id,
 					target: get(searchQuery, 'target') || '_self',
 				} as ButtonAction),
 			buttonAction: element.buttonAction,
@@ -156,11 +199,14 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 			organisation: itemOrCollection.organisation || '',
 			thumbnail: {
 				label: itemLabel,
-				meta: isItem ? itemDuration : `${collectionItems} items`,
+				meta: isItem
+					? itemDuration
+					: `${collectionItems} ${isCollection ? 'items' : 'collecties'}`,
 				src: itemOrCollection.thumbnail_path || '',
 			},
 			src: itemOrCollection.src,
-		} as any; // TODO remove cast after update to components v1.47.0
+			item_collaterals: get(itemOrCollection, 'item_collaterals', null),
+		} as any;
 	};
 
 	const renderPlayerModalBody = (item: MediaListItem) => {
@@ -182,7 +228,7 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 	// Render
 	const renderMediaGridBlock = () => {
 		return (
-			<BlockMediaList
+			<BlockMediaGrid
 				title={title}
 				buttonLabel={buttonLabel}
 				buttonAction={buttonAction || searchQuery}
@@ -201,17 +247,7 @@ const MediaGridWrapper: FunctionComponent<MediaGridWrapperProps &
 				ctaButtonAction={ctaButtonAction}
 				fullWidth={isMobileWidth()}
 				elements={(resolvedResults || []).map(mapCollectionOrItemData)}
-				navigate={(buttonAction: any) =>
-					buttonAction
-						? navigateToContentType(buttonAction, history)
-						: () => {
-								console.error(
-									new CustomError(
-										'Failed to navigate because button action is undefined'
-									)
-								);
-						  }
-				}
+				renderLink={renderLink}
 				renderPlayerModalBody={renderPlayerModalBody}
 			/>
 		);

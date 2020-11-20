@@ -6,7 +6,7 @@ import { initReactI18next } from 'react-i18next';
 import { getEnv } from '../helpers';
 
 let resolveTranslations: () => void | undefined;
-export const waitForTranslations = new Promise(resolve => {
+export const waitForTranslations = new Promise((resolve) => {
 	resolveTranslations = resolve;
 });
 
@@ -34,8 +34,11 @@ I18n.use(XHR)
 		react: {
 			useSuspense: false,
 		},
-		parseMissingKeyHandler: key => {
-			return `${upperFirst(lowerCase(key.split('___').pop()))} ***`;
+		parseMissingKeyHandler: (key) => {
+			if (key.includes('___')) {
+				return `${upperFirst(lowerCase(key.split('___').pop()))} ***`;
+			}
+			return `${key} ***`;
 		},
 	});
 

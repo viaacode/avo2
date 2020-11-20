@@ -26,14 +26,17 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
-import { getProfileId, getProfileName } from '../../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../../authentication/helpers/get-profile-id';
+import { getProfileName } from '../../../authentication/helpers/get-profile-info';
 import { CollectionService } from '../../../collection/collection.service';
 import { ContentTypeNumber } from '../../../collection/collection.types';
 import {
 	formatDurationHoursMinutesSeconds,
+	isMobileWidth,
 	parseDuration,
 	toSeconds,
 } from '../../../shared/helpers';
+import { getValidStartAndEnd } from '../../../shared/helpers/cut-start-and-end';
 import { ToastService } from '../../../shared/services';
 import { trackEvents } from '../../../shared/services/event-logging-service';
 import { VideoStillService } from '../../../shared/services/video-stills-service';
@@ -78,13 +81,17 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 	const minTime: number = 0;
 	const maxTime: number = toSeconds(itemMetaData.duration) || 0;
 
+	const clampDuration = (value: number): number => {
+		return clamp(value, minTime, maxTime);
+	};
+
 	const fetchCollections = React.useCallback(
 		() =>
 			CollectionService.fetchCollectionsOrBundlesByUser('collection', user)
 				.then((collectionTitles: Partial<Avo.Collection.Collection>[]) => {
 					setCollections(collectionTitles);
 				})
-				.catch(err => {
+				.catch((err) => {
 					console.error(err);
 					ToastService.danger(
 						t(
@@ -96,7 +103,7 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 	);
 
 	useEffect(() => {
-		fetchCollections().catch(err => {
+		fetchCollections().catch((err) => {
 			console.error('Failed to fetch collections', err);
 			ToastService.danger(
 				t(
@@ -142,9 +149,9 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 
 		return {
 			use_custom_fields: false,
-			start_oc: hasCut ? fragmentStartTime : null,
 			position: (collection.collection_fragments || []).length,
 			external_id: externalId,
+			start_oc: hasCut ? fragmentStartTime : null,
 			end_oc: hasCut ? fragmentEndTime : null,
 			custom_title: null,
 			custom_description: null,
@@ -176,12 +183,12 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 			trackEvents(
 				{
 					object: String(collection.id),
-					object_type: 'collections',
+					object_type: 'collection',
 					message: `Gebruiker ${getProfileName(user)} heeft fragment ${get(
 						fragments,
 						'[0].id'
-					)} toegevoegd aan collectie ${collection.id}`,
-					action: 'add_to_collection',
+					)} toegevoegd aan een collectie`,
+					action: 'add_to',
 				},
 				user
 			);
@@ -231,8 +238,19 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 				newCollection
 			);
 
+			trackEvents(
+				{
+					object: insertedCollection.id || '',
+					object_type: 'collection',
+					message: `${getProfileName(user)} heeft een collectie aangemaakt`,
+					action: 'create',
+				},
+				user
+			);
+
 			// Add fragment to collection
 			await addItemToExistingCollection(insertedCollection);
+
 			await fetchCollections();
 			onClose();
 
@@ -268,10 +286,6 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 				addItemToExistingCollection(
 					selectedCollection as Partial<Avo.Collection.Collection>
 				);
-
-	const clampDuration = (duration: number): number => {
-		return clamp(duration, minTime, maxTime);
-	};
 
 	const updateStartAndEnd = (type: 'start' | 'end', value?: string) => {
 		if (value) {
@@ -348,6 +362,11 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 
 	const renderAddToCollectionModal = () => {
 		const fragmentDuration = toSeconds(itemMetaData.duration) || 0;
+		const [start, end] = getValidStartAndEnd(
+			fragmentStartTime,
+			fragmentEndTime,
+			fragmentDuration
+		);
 
 		return (
 			<Modal
@@ -368,8 +387,9 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 									showTitle
 									showDescription
 									canPlay={isOpen}
-									cuePoints={{ start: fragmentStartTime, end: fragmentEndTime }}
+									cuePoints={{ start, end }}
 									seekTime={fragmentStartTime || 0}
+									verticalLayout={isMobileWidth()}
 								/>
 								<Grid>
 									<Column size="2-7">
@@ -377,16 +397,13 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 											<TextInput
 												value={fragmentStartString}
 												onBlur={() => updateStartAndEnd('start')}
-												onChange={endTime =>
+												onChange={(endTime) =>
 													updateStartAndEnd('start', endTime)
 												}
 											/>
 											<div className="m-multi-range-wrapper">
 												<MultiRange
-													values={[
-														fragmentStartTime,
-														Math.min(fragmentEndTime, fragmentDuration),
-													]}
+													values={[start, end]}
 													onChange={onUpdateMultiRangeValues}
 													min={0}
 													max={fragmentDuration}
@@ -396,7 +413,7 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 											<TextInput
 												value={fragmentEndString}
 												onBlur={() => updateStartAndEnd('end')}
-												onChange={endTime =>
+												onChange={(endTime) =>
 													updateStartAndEnd('end', endTime)
 												}
 											/>
@@ -417,9 +434,9 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 													checked={!createNewCollection}
 													value="existing"
 													name="collection"
-													onChange={checked =>
-														setCreateNewCollection(!checked)
-													}
+													onChange={() => {
+														setCreateNewCollection(false);
+													}}
 												/>
 												<div>
 													{collections.length ? (
@@ -471,6 +488,9 @@ const AddToCollectionModal: FunctionComponent<AddToCollectionModalProps> = ({
 													checked={createNewCollection}
 													value="new"
 													name="collection"
+													onChange={() => {
+														setCreateNewCollection(true);
+													}}
 												/>
 												<div>
 													<TextInput

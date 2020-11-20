@@ -29,7 +29,9 @@ export async function getRelatedItems(
 		const response = await fetchWithLogout(url, body);
 
 		// Apply default audio stills
-		const processedResults = ((await response.json()).results || []).map(
+
+		const resolvedResponse = await response.json();
+		const processedResults = (resolvedResponse.results || []).map(
 			(result: Avo.Search.ResultItem) => {
 				if (result.administrative_type === 'audio') {
 					result.thumbnail_path = DEFAULT_AUDIO_STILL;

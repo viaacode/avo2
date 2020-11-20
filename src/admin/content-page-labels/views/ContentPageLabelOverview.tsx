@@ -2,24 +2,29 @@ import { get, isNil } from 'lodash-es';
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
+import { Link } from 'react-router-dom';
 
-import { Button, ButtonToolbar, Container } from '@viaa/avo2-components';
+import { Button, ButtonToolbar } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
 import { GENERATE_SITE_TITLE } from '../../../constants';
 import { ErrorView } from '../../../error/views';
 import {
+	CheckboxDropdownModalProps,
 	CheckboxOption,
 	DeleteObjectModal,
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../../shared/components';
-import { formatDate, navigate } from '../../../shared/helpers';
+import SmartLink from '../../../shared/components/SmartLink/SmartLink';
+import { buildLink, formatDate, navigate } from '../../../shared/helpers';
 import { truncateTableValue } from '../../../shared/helpers/truncate';
 import { ToastService } from '../../../shared/services';
 import i18n from '../../../shared/translations/i18n';
+import { ADMIN_PATH } from '../../admin.const';
 import { useContentTypes } from '../../content/hooks';
 import { ItemsTableState } from '../../items/items.types';
+import { GET_CONTENT_TYPE_LABELS } from '../../shared/components/ContentPicker/ContentPicker.const';
 import FilterTable, {
 	FilterableColumn,
 	getFilters,
@@ -54,17 +59,19 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
 	const [loadingInfo, setLoadingInfo] = useState<LoadingInfo>({ state: 'loading' });
 	const [tableState, setTableState] = useState<Partial<ContentPageLabelTableState>>({});
+	const [isLoading, setIsLoading] = useState<boolean>(false);
 
 	const [contentTypes] = useContentTypes();
 
 	const [t] = useTranslation();
 
 	const fetchContentPageLabels = useCallback(async () => {
+		setIsLoading(true);
 		const generateWhereObject = (filters: Partial<ItemsTableState>) => {
 			const andFilters: any[] = [];
 			andFilters.push(
-				...getQueryFilter(filters.query, (queryWordWildcard: string) => [
-					{ label: { _ilike: queryWordWildcard } },
+				...getQueryFilter(filters.query, (queryWildcard: string) => [
+					{ label: { _ilike: queryWildcard } },
 				])
 			);
 			andFilters.push(...getDateRangeFilters(filters, ['created_at', 'updated_at']));
@@ -93,6 +100,7 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 				),
 			});
 		}
+		setIsLoading(false);
 	}, [setContentPageLabels, setLoadingInfo, t, tableState]);
 
 	useEffect(() => {
@@ -120,15 +128,23 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 			id: 'label',
 			label: i18n.t('admin/content-page-labels/views/content-page-label-overview___label'),
 			sortable: true,
+			visibleByDefault: true,
 		},
 		{
 			id: 'content_type',
 			label: i18n.t('admin/content-page-labels/views/content-page-label-overview___type'),
 			sortable: true,
+			visibleByDefault: true,
 			filterType: 'CheckboxDropdownModal',
 			filterProps: {
 				options: contentTypeOptions,
-			},
+			} as CheckboxDropdownModalProps,
+		},
+		{
+			id: 'link_to',
+			label: i18n.t('admin/content-page-labels/views/content-page-label-overview___link'),
+			sortable: false,
+			visibleByDefault: true,
 		},
 		{
 			id: 'created_at',
@@ -136,6 +152,7 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 				'admin/content-page-labels/views/content-page-label-overview___gemaakt-op'
 			),
 			sortable: true,
+			visibleByDefault: true,
 			filterType: 'DateRangeDropdown',
 		},
 		{
@@ -144,9 +161,14 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 				'admin/content-page-labels/views/content-page-label-overview___aangepast-op'
 			),
 			sortable: true,
+			visibleByDefault: true,
 			filterType: 'DateRangeDropdown',
 		},
-		{ id: 'actions', label: '' },
+		{
+			id: 'actions',
+			tooltip: i18n.t('admin/content-page-labels/views/content-page-label-overview___acties'),
+			visibleByDefault: true,
+		},
 	];
 
 	// Methods
@@ -156,8 +178,7 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 		ToastService.success(
 			t(
 				'admin/content-page-labels/views/content-page-label-overview___de-content-pagina-label-is-verwijdert'
-			),
-			false
+			)
 		);
 	};
 
@@ -172,9 +193,28 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 		columnId: ContentPageLabelOverviewTableCols
 	) => {
 		switch (columnId) {
+			case 'label':
+				return (
+					<Link to={buildLink(ADMIN_PATH.CONTENT_PAGE_LABEL_DETAIL, { id: rowData.id })}>
+						{truncateTableValue(rowData[columnId])}
+					</Link>
+				);
+
 			case 'created_at':
 			case 'updated_at':
 				return !!rowData[columnId] ? formatDate(rowData[columnId] as string) : '-';
+
+			case 'link_to':
+				const linkTo = rowData.link_to;
+				if (!linkTo) {
+					return '-';
+				}
+				const labels = GET_CONTENT_TYPE_LABELS();
+				return (
+					<SmartLink action={linkTo} removeStyles={false}>{`${labels[linkTo.type]} - ${
+						linkTo.label
+					}`}</SmartLink>
+				);
 
 			case 'actions':
 				return (
@@ -270,9 +310,10 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 					)}
 					itemsPerPage={ITEMS_PER_PAGE}
 					onTableStateChanged={setTableState}
+					isLoading={isLoading}
 				/>
 				<DeleteObjectModal
-					deleteObjectCallback={() => handleDelete()}
+					deleteObjectCallback={handleDelete}
 					isOpen={isConfirmModalOpen}
 					onClose={() => setIsConfirmModalOpen(false)}
 				/>
@@ -285,6 +326,7 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 			pageTitle={t(
 				'admin/content-page-labels/views/content-page-label-overview___content-pagina-labels-overzicht'
 			)}
+			size="full-width"
 		>
 			<AdminLayoutTopBarRight>
 				<Button
@@ -310,15 +352,11 @@ const ContentPageLabelOverview: FunctionComponent<ContentPageLabelOverviewProps>
 						)}
 					/>
 				</MetaTags>
-				<Container mode="vertical" size="small">
-					<Container mode="horizontal">
-						<LoadingErrorLoadedComponent
-							loadingInfo={loadingInfo}
-							dataObject={contentPageLabel}
-							render={renderContentPageLabelTable}
-						/>
-					</Container>
-				</Container>
+				<LoadingErrorLoadedComponent
+					loadingInfo={loadingInfo}
+					dataObject={contentPageLabel}
+					render={renderContentPageLabelTable}
+				/>
 			</AdminLayoutBody>
 		</AdminLayout>
 	);

@@ -27,7 +27,7 @@ export const convertBlocksToDatabaseFormat = (
 	contentBlockConfigs: Partial<ContentBlockConfig>[],
 	contentId?: number
 ): Partial<Avo.ContentPage.Block>[] =>
-	contentBlockConfigs.map(contentBlockConfig =>
+	contentBlockConfigs.map((contentBlockConfig) =>
 		convertBlockToDatabaseFormat(contentBlockConfig, contentId)
 	);
 
@@ -38,7 +38,7 @@ export const parseContentBlocks = (
 	const sortedContentBlocks = contentBlocks.sort((a, b) => a.position - b.position);
 
 	return compact(
-		(sortedContentBlocks || []).map(contentBlock => {
+		(sortedContentBlocks || []).map((contentBlock) => {
 			const { content_block_type, id, variables } = contentBlock;
 			const configForType = CONTENT_BLOCK_CONFIG_MAP[content_block_type as ContentBlockType];
 			if (!configForType) {

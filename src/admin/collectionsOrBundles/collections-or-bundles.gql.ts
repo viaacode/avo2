@@ -14,77 +14,149 @@ export const GET_COLLECTIONS = gql`
 			title
 			description
 			is_public
-			is_deleted
 			created_at
+			owner_profile_id
 			profile {
 				id
-				organisation {
-					logo_url
-					name
-					or_id
+				profile_user_groups {
+					groups {
+						label
+						id
+					}
 				}
 				user: usersByuserId {
 					id
-					first_name
-					last_name
-					role {
-						id
-						label
-					}
+					full_name
 				}
 			}
-			view_counts_aggregate {
-				aggregate {
-					sum {
-						count
-					}
-				}
-			}
-			collection_bookmarks_aggregate {
-				aggregate {
-					count(distinct: false)
-				}
-			}
-			lom_context
-			lom_classification
 			updated_by {
 				id
 				user: usersByuserId {
 					id
-					first_name
-					last_name
-					role {
-						id
-						label
-					}
+					full_name
 				}
 			}
 			collection_labels {
 				id
 				label
 			}
-			copies: relations_aggregate(where: { predicate: { _eq: "HAS_COPY" } }) {
-				aggregate {
-					count
-				}
-			}
-			in_bundle: relations_aggregate(where: { predicate: { _eq: "USED_IN_COLLECTION" } }) {
-				aggregate {
-					count
-				}
-			}
-			in_assignment: relations_aggregate(
-				where: { predicate: { _eq: "USED_IN_ASSIGNMENT" } }
-			) {
-				aggregate {
-					count
-				}
+			counts {
+				bookmarks
+				in_assignment
+				in_collection
+				views
+				copies
 			}
 		}
 		app_collections_aggregate(where: $where) {
 			aggregate {
 				count
 			}
+		}
+	}
+`;
+
+// TODO add relations back into the collections query to show which collections are a copy of which collection
+// We first want to test how fast the query is, before we make it heavier again:
+//
+// relations(where: { predicate: { _eq: "IS_COPY_OF" } }) {
+// 	subject
+// 	predicate
+// 	object
+// }
+
+export const GET_COLLECTION_IDS = gql`
+	query getCollections($where: app_collections_bool_exp!) {
+		app_collections(where: $where) {
+			id
+		}
+	}
+`;
+
+export const BULK_UPDATE_PUBLISH_STATE_FOR_COLLECTIONS = gql`
+	mutation bulkUpdatePublishSTateForCollections(
+		$isPublic: Boolean!
+		$collectionIds: [uuid!]!
+		$now: timestamptz!
+		$updatedByProfileId: uuid!
+	) {
+		update_app_collections(
+			where: { id: { _in: $collectionIds } }
+			_set: {
+				is_public: $isPublic
+				updated_at: $now
+				updated_by_profile_id: $updatedByProfileId
+			}
+		) {
+			affected_rows
+		}
+	}
+`;
+
+export const BULK_UPDATE_AUTHOR_FOR_COLLECTIONS = gql`
+	mutation bulkUpdateAuthorForCollections(
+		$authorId: uuid!
+		$collectionIds: [uuid!]!
+		$now: timestamptz!
+		$updatedByProfileId: uuid!
+	) {
+		update_app_collections(
+			where: { id: { _in: $collectionIds } }
+			_set: {
+				owner_profile_id: $authorId
+				updated_at: $now
+				updated_by_profile_id: $updatedByProfileId
+			}
+		) {
+			affected_rows
+		}
+	}
+`;
+
+export const BULK_DELETE_COLLECTIONS = gql`
+	mutation bulkDeleteCollections(
+		$collectionIds: [uuid!]!
+		$now: timestamptz!
+		$updatedByProfileId: uuid!
+	) {
+		update_app_collections(
+			where: { id: { _in: $collectionIds } }
+			_set: { is_deleted: true, updated_at: $now, updated_by_profile_id: $updatedByProfileId }
+		) {
+			affected_rows
+		}
+	}
+`;
+
+export const BULK_ADD_LABELS_TO_COLLECTIONS = gql`
+	mutation bulkAddLabelsToCollections($labels: [app_collection_labels_insert_input!]!) {
+		insert_app_collection_labels(objects: $labels) {
+			affected_rows
+		}
+	}
+`;
+
+export const BULK_DELETE_LABELS_FROM_COLLECTIONS = gql`
+	mutation bulkDeleteLabelsFromCollections($labels: [String!]!, $collectionIds: [uuid!]!) {
+		delete_app_collection_labels(
+			where: { label: { _in: $labels }, collection_uuid: { _in: $collectionIds } }
+		) {
+			affected_rows
+		}
+	}
+`;
+
+export const BULK_UPDATE_DATE_AND_LAST_AUTHOR_COLLECTIONS = gql`
+	mutation bulkUpdateDateAndLastAuthorCollections(
+		$collectionIds: [uuid!]!
+		$now: timestamptz!
+		$updatedByProfileId: uuid!
+	) {
+		update_app_collections(
+			where: { id: { _in: $collectionIds } }
+			_set: { updated_at: $now, updated_by_profile_id: $updatedByProfileId }
+		) {
+			affected_rows
 		}
 	}
 `;

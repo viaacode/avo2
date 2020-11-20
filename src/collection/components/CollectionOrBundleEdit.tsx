@@ -18,21 +18,18 @@ import {
 	Button,
 	ButtonToolbar,
 	Container,
-	DropdownButton,
-	DropdownContent,
 	Flex,
 	FlexItem,
 	Header,
 	HeaderAvatar,
 	HeaderButtons,
-	MenuContent,
 	Navbar,
 	Spacer,
 	TabProps,
 	Tabs,
 	Toolbar,
 	ToolbarItem,
-	ToolbarRight,
+	ToolbarLeft,
 } from '@viaa/avo2-components';
 import { Avo } from '@viaa/avo2-types';
 
@@ -43,13 +40,13 @@ import { PermissionName, PermissionService } from '../../authentication/helpers/
 import { redirectToClientPage } from '../../authentication/helpers/redirects';
 import { APP_PATH, GENERATE_SITE_TITLE } from '../../constants';
 import {
-	ControlledDropdown,
 	DraggableListModal,
 	InputModal,
 	InteractiveTour,
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../shared/components';
+import MoreOptionsDropdown from '../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
 import {
 	buildLink,
 	createDropdownMenuItem,
@@ -58,16 +55,19 @@ import {
 	navigate,
 	renderAvatar,
 	sanitizeHtml,
+	stripHtml,
 } from '../../shared/helpers';
 import withUser from '../../shared/hocs/withUser';
-import { ApolloCacheManager, dataService, ToastService } from '../../shared/services';
+import { BookmarksViewsPlaysService, ToastService } from '../../shared/services';
+import { DEFAULT_BOOKMARK_VIEW_PLAY_COUNTS } from '../../shared/services/bookmarks-views-plays-service';
+import { BookmarkViewPlayCounts } from '../../shared/services/bookmarks-views-plays-service/bookmarks-views-plays-service.types';
 import { trackEvents } from '../../shared/services/event-logging-service';
 import { ValueOf } from '../../shared/types';
 import { COLLECTIONS_ID } from '../../workspace/workspace.const';
 import { GET_COLLECTION_EDIT_TABS, MAX_TITLE_LENGTH } from '../collection.const';
-import { DELETE_COLLECTION } from '../collection.gql';
 import { getFragmentsFromCollection, reorderFragments } from '../collection.helpers';
 import { CollectionService } from '../collection.service';
+import { toDutchContentType } from '../collection.types';
 import { PublishCollectionModal } from '../components';
 import { getFragmentProperty } from '../helpers';
 
@@ -129,8 +129,9 @@ interface CollectionOrBundleEditProps {
 	type: 'collection' | 'bundle';
 }
 
-const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
-	DefaultSecureRouteProps<{ id: string }>> = ({ type, history, location, match, user }) => {
+const CollectionOrBundleEdit: FunctionComponent<
+	CollectionOrBundleEditProps & DefaultSecureRouteProps<{ id: string }>
+> = ({ type, history, location, match, user }) => {
 	const [t] = useTranslation();
 
 	// State
@@ -153,6 +154,9 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 			canViewItems: boolean;
 		}>
 	>({});
+	const [bookmarkViewPlayCounts, setBookmarkViewPlayCounts] = useState<BookmarkViewPlayCounts>(
+		DEFAULT_BOOKMARK_VIEW_PLAY_COUNTS
+	);
 
 	// Computed values
 	const isCollection = type === 'collection';
@@ -326,7 +330,8 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 			};
 			const collectionObj = await CollectionService.fetchCollectionOrBundleWithItemsById(
 				collectionId,
-				type
+				type,
+				undefined
 			);
 
 			if (!collectionObj) {
@@ -339,6 +344,24 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 						: t('bundle/views/bundle-detail___de-bundel-kon-niet-worden-gevonden'),
 					icon: 'search',
 				});
+				return;
+			}
+
+			try {
+				setBookmarkViewPlayCounts(
+					await BookmarksViewsPlaysService.getCollectionCounts(collectionObj.id, user)
+				);
+			} catch (err) {
+				console.error(
+					new CustomError('Failed to get getCollectionCounts', err, {
+						uuid: collectionObj.id,
+					})
+				);
+				ToastService.danger(
+					t(
+						'collection/views/collection-detail___het-ophalen-van-het-aantal-keer-bekeken-gebookmarked-is-mislukt'
+					)
+				);
 			}
 
 			setPermissions(permissionObj);
@@ -398,13 +421,13 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 	}));
 
 	const convertFragmentDescriptionsToHtml = (
-		collection: Avo.Collection.Collection | null
-	): Avo.Collection.Collection | null => {
+		collection: Partial<Avo.Collection.Collection> | null
+	): Partial<Avo.Collection.Collection> | null => {
 		if (!collection) {
 			return collection;
 		}
 		const clonedCollection = cloneDeep(collection);
-		getFragmentsFromCollection(clonedCollection).forEach(fragment => {
+		getFragmentsFromCollection(clonedCollection).forEach((fragment) => {
 			if (fragment.custom_description && (fragment.custom_description as any).toHTML) {
 				fragment.custom_description = sanitizeHtml(
 					(fragment.custom_description as any).toHTML(),
@@ -424,15 +447,15 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 		setIsSavingCollection(true);
 
 		// Convert fragment description editor states to html strings
-		const updatedCollection = convertFragmentDescriptionsToHtml(({
-			...collectionState.currentCollection,
+		const updatedCollection = convertFragmentDescriptionsToHtml({
+			...(collectionState.currentCollection as Avo.Collection.Collection),
 			updated_by_profile_id: get(user, 'profile.id', null),
-		} as unknown) as Avo.Collection.Collection) as Avo.Collection.Collection; // TODO remove cast after update to typings 2.17.0
+		});
 
 		if (collectionState.currentCollection) {
 			const newCollection = await CollectionService.updateCollection(
 				collectionState.initialCollection,
-				updatedCollection
+				updatedCollection as Partial<Avo.Collection.Collection>
 			);
 
 			if (newCollection) {
@@ -447,10 +470,8 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 				trackEvents(
 					{
 						object: String(newCollection.id),
-						object_type: 'collections',
-						message: `Gebruiker ${getProfileName(user)} heeft de ${type} ${
-							newCollection.id
-						} bijgewerkt`,
+						object_type: type,
+						message: `Gebruiker ${getProfileName(user)} heeft een ${type} aangepast`,
 						action: 'edit',
 					},
 					user
@@ -546,21 +567,15 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 				);
 				return;
 			}
-			await dataService.mutate({
-				mutation: DELETE_COLLECTION,
-				variables: {
-					id: collectionState.currentCollection.id,
-				},
-				update: ApolloCacheManager.clearCollectionCache,
-			});
+			await CollectionService.deleteCollection(collectionState.currentCollection.id);
 
 			trackEvents(
 				{
 					object: String(collectionState.currentCollection.id),
-					object_type: 'collections',
-					message: `Gebruiker ${getProfileName(user)} heeft de ${type} ${
-						collectionState.currentCollection.id
-					} verwijderd`,
+					object_type: type,
+					message: `Gebruiker ${getProfileName(user)} heeft een ${toDutchContentType(
+						type
+					)} verwijderd`,
 					action: 'delete',
 				},
 				user
@@ -588,6 +603,7 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 	// const onPreviewCollection = () => {};
 
 	const executeAction = async (item: ReactText) => {
+		setIsOptionsMenuOpen(false);
 		switch (item) {
 			case 'rename':
 				onClickRename();
@@ -760,6 +776,7 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 					collection_uuid: bundleId,
 					item_meta: collection,
 					type: 'COLLECTION',
+					created_at: new Date().toISOString(),
 				};
 				changeCollectionState({
 					type: 'INSERT_FRAGMENT',
@@ -795,7 +812,8 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 	};
 
 	const renderDraggableFragment = (fragment: Avo.Collection.Fragment): ReactNode => {
-		const thumbnail = get(fragment, 'item_meta.thumbnail_path');
+		const thumbnail =
+			get(fragment, 'thumbnail_path') || get(fragment, 'item_meta.thumbnail_path');
 		return (
 			<Flex className="c-collection-or-bundle-edit__draggable-item">
 				<FlexItem shrink>
@@ -809,7 +827,15 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 								fragment,
 								fragment.use_custom_fields,
 								'title'
-							),
+							) ||
+								stripHtml(
+									getFragmentProperty(
+										fragment.item_meta,
+										fragment,
+										fragment.use_custom_fields,
+										'description'
+									) || ''
+								),
 							{ length: 50 }
 						)}
 					</BlockHeading>
@@ -825,10 +851,7 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 					return (
 						<CollectionOrBundleEditContent
 							type={type}
-							collectionId={collectionState.currentCollection.id}
-							collectionFragments={
-								collectionState.currentCollection.collection_fragments
-							}
+							collection={collectionState.currentCollection}
 							changeCollectionState={changeCollectionState}
 							history={history}
 							location={location}
@@ -949,32 +972,13 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 					)}
 					onClick={() => setIsReorderModalOpen(true)}
 				/>
-				<ControlledDropdown
+				<MoreOptionsDropdown
 					isOpen={isOptionsMenuOpen}
-					menuWidth="fit-content"
 					onOpen={() => setIsOptionsMenuOpen(true)}
 					onClose={() => setIsOptionsMenuOpen(false)}
-					placement="bottom-end"
-				>
-					<DropdownButton>
-						<Button
-							type="secondary"
-							icon="more-horizontal"
-							ariaLabel={t(
-								'collection/components/collection-or-bundle-edit___meer-opties'
-							)}
-							title={t(
-								'collection/components/collection-or-bundle-edit___meer-opties'
-							)}
-						/>
-					</DropdownButton>
-					<DropdownContent>
-						<MenuContent
-							menuItems={COLLECTION_DROPDOWN_ITEMS}
-							onClick={executeAction}
-						/>
-					</DropdownContent>
-				</ControlledDropdown>
+					menuItems={COLLECTION_DROPDOWN_ITEMS}
+					onOptionClicked={executeAction}
+				/>
 				<Spacer margin="left-small">{renderSaveButton()}</Spacer>
 				<InteractiveTour showButton />
 			</ButtonToolbar>
@@ -1009,29 +1013,13 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 		];
 		return (
 			<ButtonToolbar>
-				<ControlledDropdown
+				<MoreOptionsDropdown
 					isOpen={isOptionsMenuOpen}
-					menuWidth="fit-content"
 					onOpen={() => setIsOptionsMenuOpen(true)}
 					onClose={() => setIsOptionsMenuOpen(false)}
-					placement="bottom-end"
-				>
-					<DropdownButton>
-						<Button
-							type="secondary"
-							icon="more-horizontal"
-							title={t(
-								'collection/components/collection-or-bundle-edit___meer-opties'
-							)}
-						/>
-					</DropdownButton>
-					<DropdownContent>
-						<MenuContent
-							menuItems={COLLECTION_DROPDOWN_ITEMS}
-							onClick={executeAction}
-						/>
-					</DropdownContent>
-				</ControlledDropdown>
+					menuItems={COLLECTION_DROPDOWN_ITEMS}
+					onOptionClicked={executeAction}
+				/>
 			</ButtonToolbar>
 		);
 	};
@@ -1052,8 +1040,8 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 					onClickTitle={() => setIsRenameModalOpen(true)}
 					category={type}
 					showMetaData
-					bookmarks="0" // TODO: Real bookmark count
-					views="0" // TODO: Real view count
+					bookmarks={String(bookmarkViewPlayCounts.bookmarkCount || 0)}
+					views={String(bookmarkViewPlayCounts.viewCount || 0)}
 				>
 					<HeaderButtons>
 						{isMobileWidth() ? renderHeaderButtonsMobile() : renderHeaderButtons()}
@@ -1069,11 +1057,11 @@ const CollectionOrBundleEdit: FunctionComponent<CollectionOrBundleEditProps &
 				<Container background="alt" mode="vertical">
 					<Container mode="horizontal">
 						<Toolbar autoHeight>
-							<ToolbarRight>
+							<ToolbarLeft>
 								<ToolbarItem>
 									<ButtonToolbar>{renderSaveButton()}</ButtonToolbar>
 								</ToolbarItem>
-							</ToolbarRight>
+							</ToolbarLeft>
 						</Toolbar>
 					</Container>
 				</Container>

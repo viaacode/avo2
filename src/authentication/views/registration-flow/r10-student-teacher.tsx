@@ -3,11 +3,10 @@ import { Trans, useTranslation } from 'react-i18next';
 import MetaTags from 'react-meta-tags';
 import { RouteComponentProps } from 'react-router';
 
-import { BlockHeading, Button, Container } from '@viaa/avo2-components';
+import { BlockHeading, Button, Container, Spacer } from '@viaa/avo2-components';
 
-import { APP_PATH, GENERATE_SITE_TITLE } from '../../../constants';
+import { GENERATE_SITE_TITLE } from '../../../constants';
 import Html from '../../../shared/components/Html/Html';
-import { redirectToClientPage } from '../../helpers/redirects';
 
 export interface StudentTeacherProps extends RouteComponentProps {}
 
@@ -33,19 +32,19 @@ const StudentTeacher: FunctionComponent<StudentTeacherProps> = ({ history }) => 
 					/>
 				</MetaTags>
 				<div className="c-content">
-					<Button
-						type="secondary"
-						onClick={() =>
-							redirectToClientPage(APP_PATH.MANUAL_ACCESS_REQUEST.route, history)
-						}
-						icon="arrow-left"
-						title={t(
-							'authentication/views/registration-flow/r-10-student-teacher___ga-terug-naar-de-manuele-account-aanvraag-pagina'
-						)}
-						ariaLabel={t(
-							'authentication/views/registration-flow/r-10-student-teacher___ga-terug-naar-de-manuele-account-aanvraag-pagina'
-						)}
-					/>
+					<Spacer margin="bottom-large">
+						<Button
+							type="secondary"
+							onClick={history.goBack}
+							icon="arrow-left"
+							title={t(
+								'authentication/views/registration-flow/r-10-student-teacher___ga-terug-naar-de-manuele-account-aanvraag-pagina'
+							)}
+							ariaLabel={t(
+								'authentication/views/registration-flow/r-10-student-teacher___ga-terug-naar-de-manuele-account-aanvraag-pagina'
+							)}
+						/>
+					</Spacer>
 					<BlockHeading type="h2">
 						<Trans i18nKey="authentication/views/registration-flow/r-10-student-teacher___het-archief-voor-onderwijs-voor-student-leerkrachten">
 							Het Archief voor Onderwijs voor Student-leerkrachten

@@ -1,4 +1,4 @@
-import { get, has, isFunction, isNil, kebabCase, without } from 'lodash-es';
+import { get, has, isFunction, isNil, without } from 'lodash-es';
 import React, {
 	FunctionComponent,
 	Reducer,
@@ -13,7 +13,7 @@ import MetaTags from 'react-meta-tags';
 import { Button, ButtonToolbar, Container, Navbar, Tabs } from '@viaa/avo2-components';
 
 import { DefaultSecureRouteProps } from '../../../authentication/components/SecuredRoute';
-import { getProfileId } from '../../../authentication/helpers/get-profile-info';
+import { getProfileId } from '../../../authentication/helpers/get-profile-id';
 import {
 	PermissionName,
 	PermissionService,
@@ -27,6 +27,8 @@ import {
 import { CustomError, navigate } from '../../../shared/helpers';
 import { useTabs } from '../../../shared/hooks';
 import { ToastService } from '../../../shared/services';
+import { ContentPageService } from '../../../shared/services/content-page-service';
+import { ADMIN_PATH } from '../../admin.const';
 import { CONTENT_BLOCK_INITIAL_STATE_MAP } from '../../content-block/content-block.const';
 import { validateContentBlockField } from '../../shared/helpers';
 import {
@@ -67,6 +69,8 @@ import ContentEditContentBlocks from './ContentEditContentBlocks';
 
 interface ContentEditProps extends DefaultSecureRouteProps<{ id?: string }> {}
 
+const { EDIT_ANY_CONTENT_PAGES, EDIT_OWN_CONTENT_PAGES } = PermissionName;
+
 const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user }) => {
 	const { id } = match.params;
 
@@ -90,28 +94,92 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 	const [contentTypes, isLoadingContentTypes] = useContentTypes();
 	const [currentTab, setCurrentTab, tabs] = useTabs(GET_CONTENT_DETAIL_TABS(), 'inhoud');
 
+	const hasPerm = useCallback(
+		(permission: PermissionName) => PermissionService.hasPerm(user, permission),
+		[user]
+	);
+
 	const fetchContentPage = useCallback(async () => {
 		try {
 			if (isNil(id)) {
 				return;
 			}
+			if (
+				!hasPerm(PermissionName.EDIT_ANY_CONTENT_PAGES) &&
+				!hasPerm(PermissionName.EDIT_OWN_CONTENT_PAGES)
+			) {
+				setLoadingInfo({
+					state: 'error',
+					message: t(
+						'admin/content/views/content-edit___je-hebt-geen-rechten-om-deze-content-pagina-te-bekijken'
+					),
+					icon: 'lock',
+				});
+				return;
+			}
+			const contentPageObj = await ContentService.getContentPageById(id);
+			if (
+				!hasPerm(PermissionName.EDIT_ANY_CONTENT_PAGES) &&
+				contentPageObj.user_profile_id !== getProfileId(user)
+			) {
+				setLoadingInfo({
+					state: 'error',
+					message: t(
+						'admin/content/views/content-edit___je-hebt-geen-rechten-om-deze-content-pagina-te-bekijken'
+					),
+					icon: 'lock',
+				});
+				return;
+			}
 			changeContentPageState({
 				type: ContentEditActionType.SET_CONTENT_PAGE,
 				payload: {
-					contentPageInfo: await ContentService.getContentPageById(id),
+					contentPageInfo: contentPageObj,
 					replaceInitial: true,
 				},
 			});
 		} catch (err) {
 			console.error(new CustomError('Failed to load content page', err, { id }));
 			ToastService.danger(
-				t(
-					'admin/content/views/content-edit___het-laden-van-deze-content-pagina-is-mislukt'
-				),
-				false
+				t('admin/content/views/content-edit___het-laden-van-deze-content-pagina-is-mislukt')
 			);
 		}
-	}, [id, t]);
+	}, [id, user, hasPerm, t]);
+
+	const onPasteContentBlock = useCallback(
+		(evt: ClipboardEvent) => {
+			try {
+				if (evt.clipboardData && evt.clipboardData.getData) {
+					const pastedText = evt.clipboardData.getData('text/plain');
+
+					if (pastedText.startsWith('{"block":')) {
+						const newConfig = JSON.parse(pastedText).block;
+						delete newConfig.id;
+						// Ensure block is added at the bottom of the page
+						newConfig.position = (
+							contentPageState.currentContentPageInfo.contentBlockConfigs || []
+						).length;
+						changeContentPageState({
+							type: ContentEditActionType.ADD_CONTENT_BLOCK_CONFIG,
+							payload: newConfig,
+						});
+
+						ToastService.success(
+							t('admin/content/views/content-edit___de-blok-is-toegevoegd')
+						);
+					}
+				}
+			} catch (err) {
+				console.error(new CustomError('Failed to paste content block', err));
+				ToastService.danger(
+					t(
+						'admin/content/views/content-edit___het-plakken-van-het-content-blok-is-mislukt'
+					)
+				);
+			}
+		},
+		[changeContentPageState, contentPageState.currentContentPageInfo.contentBlockConfigs, t]
+	);
 
 	useEffect(() => {
 		fetchContentPage();
@@ -123,6 +191,14 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 		}
 	}, [contentPageState.currentContentPageInfo, isLoadingContentTypes]);
 
+	useEffect(() => {
+		document.body.addEventListener('paste', onPasteContentBlock);
+
+		return () => {
+			document.body.removeEventListener('paste', onPasteContentBlock);
+		};
+	}, [onPasteContentBlock]);
+
 	// Computed
 	const pageType = id ? PageType.Edit : PageType.Create;
 	let pageTitle = t('admin/content/views/content-edit___content-toevoegen');
@@ -133,17 +209,12 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 			''
 		)}`;
 	}
-	const isAdminUser = PermissionService.hasPerm(user, PermissionName.EDIT_PROTECTED_PAGE_STATUS);
 
 	// Methods
 	const openDeleteModal = (configIndex: number) => {
 		setIsDeleteModalOpen(true);
 		setConfigToDelete(configIndex);
 	};
-
-	const getPathOrDefault = (): string =>
-		contentPageState.currentContentPageInfo.path ||
-		`/${kebabCase(contentPageState.currentContentPageInfo.title)}`;
 
 	const handleSave = async () => {
 		try {
@@ -170,11 +241,11 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 			// Run validators on to check untouched inputs
 			blockConfigs.forEach((config, configIndex) => {
 				const { fields, state } = config.components;
-				const keysToValidate = Object.keys(fields).filter(key => fields[key].validator);
+				const keysToValidate = Object.keys(fields).filter((key) => fields[key].validator);
 				let newErrors: ContentBlockErrors = {};
 
 				if (keysToValidate.length > 0) {
-					keysToValidate.forEach(key => {
+					keysToValidate.forEach((key) => {
 						const validator = fields[key].validator;
 
 						if (validator && isFunction(validator)) {
@@ -217,16 +288,14 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 					ToastService.danger(
 						t(
 							'admin/content/views/content-edit___er-zijn-nog-fouten-in-het-metadata-formulier'
-						),
-						false
+						)
 					);
 				}
 				if (!areConfigsValid) {
 					ToastService.danger(
 						t(
 							'admin/content/views/content-edit___er-zijn-nog-fouten-in-de-content-blocks'
-						),
-						false
+						)
 					);
 				}
 
@@ -239,9 +308,7 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 					...contentPageState.currentContentPageInfo,
 					user_profile_id: getProfileId(user),
 					contentBlockConfigs: blockConfigs,
-					path:
-						contentPageState.currentContentPageInfo.path ||
-						`/${kebabCase(contentPageState.currentContentPageInfo.title || '')}`,
+					path: ContentService.getPathOrDefault(contentPageState.currentContentPageInfo),
 				};
 				insertedOrUpdatedContent = await ContentService.insertContentPage(contentBody);
 			} else {
@@ -251,6 +318,9 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 						updated_at: new Date().toISOString(),
 						id: parseInt(id, 10),
 						contentBlockConfigs: blockConfigs,
+						path: ContentService.getPathOrDefault(
+							contentPageState.currentContentPageInfo
+						),
 					};
 					insertedOrUpdatedContent = await ContentService.updateContentPage(
 						contentBody,
@@ -298,17 +368,15 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 			]);
 
 			ToastService.success(
-				t('admin/content/views/content-edit___het-content-item-is-succesvol-opgeslagen'),
-				false
+				t('admin/content/views/content-edit___het-content-item-is-succesvol-opgeslagen')
 			);
-			navigate(history, CONTENT_PATH.CONTENT_DETAIL, { id: insertedOrUpdatedContent.id });
+			navigate(history, CONTENT_PATH.CONTENT_PAGE_DETAIL, {
+				id: insertedOrUpdatedContent.id,
+			});
 		} catch (err) {
 			console.error(new CustomError('Failed to save content page ', err));
 			ToastService.danger(
-				t(
-					'admin/content/views/content-edit___het-opslaan-van-de-content-pagina-is-mislukt'
-				),
-				false
+				t('admin/content/views/content-edit___het-opslaan-van-de-content-pagina-is-mislukt')
 			);
 		}
 
@@ -327,10 +395,12 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 		}
 
 		// check if the path is unique
-		const path = getPathOrDefault();
+		const path = ContentService.getPathOrDefault(contentPageState.currentContentPageInfo);
 
 		try {
-			const page: ContentPageInfo | null = await ContentService.fetchContentPageByPath(path);
+			const page: ContentPageInfo | null = await ContentPageService.getContentPageByPath(
+				path
+			);
 			if (page && String(page.id) !== id) {
 				errors.path = t(
 					'admin/content/views/content-edit___dit-path-is-reeds-gebruikt-door-pagina-page-title',
@@ -338,6 +408,8 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 						pageTitle: page.title,
 					}
 				);
+			} else {
+				delete errors.path;
 			}
 		} catch (err) {
 			// ignore error if content page does not exist yet, since we're trying to save it
@@ -361,9 +433,9 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 
 	const navigateBack = () => {
 		if (pageType === PageType.Create) {
-			history.push(CONTENT_PATH.CONTENT);
+			history.push(CONTENT_PATH.CONTENT_PAGE_OVERVIEW);
 		} else {
-			navigate(history, CONTENT_PATH.CONTENT_DETAIL, { id });
+			navigate(history, CONTENT_PATH.CONTENT_PAGE_DETAIL, { id });
 		}
 	};
 
@@ -440,7 +512,6 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 						contentTypes={contentTypes}
 						formErrors={formErrors}
 						contentPageInfo={contentPageState.currentContentPageInfo}
-						isAdminUser={isAdminUser}
 						changeContentPageState={changeContentPageState}
 						user={user}
 					/>
@@ -450,42 +521,19 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 		}
 	};
 
-	const onPasteContentBlock = (e: any) => {
-		try {
-			if (e.clipboardData && e.clipboardData.getData) {
-				const pastedText = e.clipboardData.getData('text/plain');
-
-				if (pastedText.startsWith('{"block":')) {
-					const newConfig = JSON.parse(pastedText).block;
-					delete newConfig.id;
-					// Ensure block is added at the bottom of the page
-					newConfig.position = (
-						contentPageState.currentContentPageInfo.contentBlockConfigs || []
-					).length;
-					changeContentPageState({
-						type: ContentEditActionType.ADD_CONTENT_BLOCK_CONFIG,
-						payload: newConfig,
-					});
-
-					ToastService.success(
-						t('admin/content/views/content-edit___de-blok-is-toegevoegd'),
-						false
-					);
-				}
-			}
-		} catch (err) {
-			console.error(new CustomError('Failed to paste content block', err));
-			ToastService.danger(
-				t('admin/content/views/content-edit___het-plakken-van-het-content-blok-is-mislukt'),
-				false
-			);
-		}
-	};
-
 	const renderEditContentPage = () => {
+		const contentPageOwner = contentPageState.initialContentPageInfo.user_profile_id;
+		const isOwner = contentPageOwner ? get(user, 'profile.id') === contentPageOwner : true;
+		const isAllowedToSave =
+			hasPerm(EDIT_ANY_CONTENT_PAGES) || (hasPerm(EDIT_OWN_CONTENT_PAGES) && isOwner);
+
 		return (
-			<div onPaste={onPasteContentBlock}>
-				<AdminLayout showBackButton pageTitle={pageTitle}>
+			<div>
+				<AdminLayout
+					onClickBackButton={() => navigate(history, ADMIN_PATH.CONTENT_PAGE_OVERVIEW)}
+					pageTitle={pageTitle}
+					size="no-margin"
+				>
 					<AdminLayoutTopBarRight>
 						<ButtonToolbar>
 							<Button
@@ -493,11 +541,13 @@ const ContentEdit: FunctionComponent<ContentEditProps> = ({ history, match, user
 								onClick={navigateBack}
 								type="tertiary"
 							/>
-							<Button
-								disabled={isSaving}
-								label={t('admin/content/views/content-edit___opslaan')}
-								onClick={handleSave}
-							/>
+							{isAllowedToSave && (
+								<Button
+									disabled={isSaving}
+									label={t('admin/content/views/content-edit___opslaan')}
+									onClick={handleSave}
+								/>
+							)}
 						</ButtonToolbar>
 					</AdminLayoutTopBarRight>
 					<AdminLayoutHeader>

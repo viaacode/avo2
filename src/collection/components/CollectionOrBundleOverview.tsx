@@ -7,11 +7,7 @@ import { Link } from 'react-router-dom';
 import {
 	Button,
 	ButtonToolbar,
-	Dropdown,
-	DropdownButton,
-	DropdownContent,
 	Icon,
-	MenuContent,
 	MetaData,
 	MetaDataItem,
 	Pagination,
@@ -23,6 +19,7 @@ import {
 import { Avo } from '@viaa/avo2-types';
 
 import { DefaultSecureRouteProps } from '../../authentication/components/SecuredRoute';
+import { getProfileName } from '../../authentication/helpers/get-profile-info';
 import { PermissionName, PermissionService } from '../../authentication/helpers/permission-service';
 import { BUNDLE_PATH } from '../../bundle/bundle.const';
 import { APP_PATH } from '../../constants';
@@ -32,22 +29,23 @@ import {
 	LoadingErrorLoadedComponent,
 	LoadingInfo,
 } from '../../shared/components';
+import MoreOptionsDropdown from '../../shared/components/MoreOptionsDropdown/MoreOptionsDropdown';
 import {
 	buildLink,
 	createDropdownMenuItem,
 	formatDate,
 	formatTimestamp,
-	fromNow,
 	generateAssignmentCreateLink,
 	isMobileWidth,
 	navigate,
 } from '../../shared/helpers';
 import { truncateTableValue } from '../../shared/helpers/truncate';
 import { ApolloCacheManager, ToastService } from '../../shared/services';
+import { trackEvents } from '../../shared/services/event-logging-service';
 import { ITEMS_PER_PAGE } from '../../workspace/workspace.const';
 import { DELETE_COLLECTION } from '../collection.gql';
 import { CollectionService } from '../collection.service';
-import { ContentTypeNumber } from '../collection.types';
+import { ContentTypeNumber, toDutchContentType } from '../collection.types';
 
 import './CollectionOrBundleOverview.scss';
 import DeleteCollectionModal from './modals/DeleteCollectionModal';
@@ -204,6 +202,18 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 				update: ApolloCacheManager.clearCollectionCache,
 			});
 
+			trackEvents(
+				{
+					object: String(idToDelete),
+					object_type: type,
+					message: `Gebruiker ${getProfileName(user)} heeft een ${toDutchContentType(
+						type
+					)} verwijderd`,
+					action: 'delete',
+				},
+				user
+			);
+
 			ToastService.success(
 				isCollection
 					? t(
@@ -237,8 +247,8 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 				APP_PATH.SEARCH.route,
 				{},
 				isCollection
-					? 'filters={"type":["video","audio"]}'
-					: 'filters={"type":["collectie"]}'
+					? { filters: '{"type":["video","audio"]}' }
+					: { filters: '{"type":["collectie"]}' }
 			)
 		);
 
@@ -284,7 +294,7 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 				<MetaData category={type}>
 					<MetaDataItem>
 						<span title={`Aangemaakt: ${formatDate(collection.created_at)}`}>
-							{fromNow(collection.created_at)}
+							{formatDate(collection.created_at)}
 						</span>
 					</MetaDataItem>
 					<MetaDataItem
@@ -328,6 +338,7 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 
 		// Listeners
 		const onClickDropdownItem = (item: ReactText) => {
+			setDropdownOpen({ [collectionId]: false });
 			switch (item) {
 				case 'edit':
 					navigate(
@@ -355,26 +366,13 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 
 		return (
 			<ButtonToolbar>
-				<Dropdown
+				<MoreOptionsDropdown
 					isOpen={dropdownOpen[collectionId] || false}
-					menuWidth="fit-content"
-					onClose={() => setDropdownOpen({ [collectionId]: false })}
 					onOpen={() => setDropdownOpen({ [collectionId]: true })}
-					placement="bottom-end"
-				>
-					<DropdownButton>
-						<Button
-							icon="more-horizontal"
-							type="borderless"
-							title={t(
-								'collection/components/collection-or-bundle-overview___meer-opties'
-							)}
-						/>
-					</DropdownButton>
-					<DropdownContent>
-						<MenuContent menuItems={ROW_DROPDOWN_ITEMS} onClick={onClickDropdownItem} />
-					</DropdownContent>
-				</Dropdown>
+					onClose={() => setDropdownOpen({ [collectionId]: false })}
+					menuItems={ROW_DROPDOWN_ITEMS}
+					onOptionClicked={onClickDropdownItem}
+				/>
 
 				{!isMobileWidth() && (
 					<Button
@@ -450,7 +448,7 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 			case 'created_at':
 			case 'updated_at':
 				const cellData = collection[colKey as 'created_at' | 'updated_at'];
-				return <span title={formatTimestamp(cellData)}>{fromNow(cellData)}</span>;
+				return <span title={formatTimestamp(cellData)}>{formatDate(cellData)}</span>;
 
 			default:
 				return null;
@@ -467,11 +465,19 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 					col: '6',
 					sortable: true,
 				},
-				{ id: 'actions', label: '', col: '1' },
+				{
+					id: 'actions',
+					tooltip: t('collection/components/collection-or-bundle-overview___acties'),
+					col: '1',
+				},
 			];
 		}
 		return [
-			{ id: 'thumbnail', label: '', col: '2' },
+			{
+				id: 'thumbnail',
+				tooltip: t('collection/components/collection-or-bundle-overview___cover'),
+				col: '2',
+			},
 			{
 				id: 'title',
 				label: t('collection/views/collection-overview___titel'),
@@ -490,22 +496,27 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 				col: '2',
 				sortable: true,
 			},
-			...(isCollection
-				? [
-						{
-							id: 'inFolder',
-							label: t('collection/views/collection-overview___in-map'),
-							col: '2' as any,
-						},
-				  ]
-				: []),
+			// TODO re-enable once we can put collections in folders https://meemoo.atlassian.net/browse/AVO-591
+			// ...(isCollection
+			// 	? [
+			// 			{
+			// 				id: 'inFolder',
+			// 				label: t('collection/views/collection-overview___in-map'),
+			// 				col: '2' as any,
+			// 			},
+			// 	  ]
+			// 	: []),
 			// TODO re-enable once users can give share collection view/edit rights with other users
 			// {
 			// 	id: 'access',
 			// 	label: t('collection/views/collection-overview___toegang'),
 			// 	col: '2',
 			// },
-			{ id: 'actions', label: '', col: '1' },
+			{
+				id: 'actions',
+				tooltip: t('collection/components/collection-or-bundle-overview___acties'),
+				col: '1',
+			},
 		];
 	};
 
@@ -571,6 +582,7 @@ const CollectionOrBundleOverview: FunctionComponent<CollectionOrBundleOverviewPr
 				<Button
 					type="primary"
 					icon="search"
+					autoHeight
 					label={
 						isCollection
 							? t('collection/views/collection-overview___maak-je-eerste-collectie')

@@ -6,8 +6,8 @@ import {
 	ContentBlockEditor,
 	ContentBlockFieldGroup,
 	ContentBlockType,
-	DEFAULT_BUTTON_PROPS,
 	DefaultContentBlockState,
+	DEFAULT_BUTTON_PROPS,
 	RichTextBlockComponentState,
 } from '../../../shared/types';
 import { GET_BUTTON_TYPE_OPTIONS } from '../../content-block.const';

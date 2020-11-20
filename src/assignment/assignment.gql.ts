@@ -53,6 +53,14 @@ export const GET_ASSIGNMENT_BY_CONTENT_ID_AND_TYPE = gql`
 		) {
 			id
 			title
+			profile {
+				user: usersByuserId {
+					id
+					first_name
+					last_name
+				}
+			}
+			is_archived
 		}
 	}
 `;
@@ -120,57 +128,56 @@ export const GET_ASSIGNMENTS_BY_RESPONSE_OWNER_ID = gql`
 		$offset: Int = 0
 		$limit: Int
 		$filter: [app_assignments_bool_exp]
-		$order: app_assignment_responses_order_by!
+		$order: app_assignments_order_by!
 	) {
-		app_assignment_responses(
+		app_assignments(
 			where: {
-				owner_profile_ids: { _has_key: $owner_profile_id }
-				assignment: { is_deleted: { _eq: false }, _and: $filter }
+				assignment_responses: { owner_profile_ids: { _has_key: $owner_profile_id } }
+				is_deleted: { _eq: false }
+				_and: $filter
 			}
 			limit: $limit
 			offset: $offset
 			order_by: [$order]
 		) {
-			assignment {
-				assignment_assignment_tags {
-					assignment_tag {
-						color_enum_value
-						color_override
-						enum_color {
-							label
-							value
-						}
-						id
+			assignment_assignment_tags {
+				assignment_tag {
+					color_enum_value
+					color_override
+					enum_color {
 						label
+						value
 					}
-				}
-				assignment_responses {
 					id
-					submitted_at
+					label
 				}
-				assignment_type
-				class_room
-				deadline_at
+			}
+			assignment_responses {
 				id
-				is_archived
-				is_deleted
-				title
-				owner_profile_id
-				created_at
-				profile {
-					user: usersByuserId {
-						first_name
-						last_name
-						id
-					}
-					avatar
-					organisation {
-						logo_url
-						name
-						or_id
-					}
+				submitted_at
+			}
+			assignment_type
+			class_room
+			deadline_at
+			id
+			is_archived
+			is_deleted
+			title
+			created_at
+			owner_profile_id
+			profile {
+				user: usersByuserId {
+					first_name
+					last_name
 					id
 				}
+				avatar
+				organisation {
+					logo_url
+					name
+					or_id
+				}
+				id
 			}
 		}
 		count: app_assignments_aggregate(
@@ -183,6 +190,20 @@ export const GET_ASSIGNMENTS_BY_RESPONSE_OWNER_ID = gql`
 			aggregate {
 				count
 			}
+		}
+	}
+`;
+
+export const GET_ASSIGNMENT_RESPONSES = gql`
+	query getAssignmentResponses($profileId: String!, $assignmentId: Int) {
+		app_assignment_responses(
+			where: {
+				owner_profile_ids: { _has_key: $profileId }
+				assignment_id: { _eq: $assignmentId }
+			}
+		) {
+			id
+			assignment_id
 		}
 	}
 `;
@@ -240,12 +261,14 @@ export const GET_ASSIGNMENT_WITH_RESPONSE = gql`
 					name
 					or_id
 				}
-				user: usersByuserId {
-					id
-					role {
+				profile_user_groups {
+					groups {
 						label
 						id
 					}
+				}
+				user: usersByuserId {
+					id
 					first_name
 					last_name
 				}
